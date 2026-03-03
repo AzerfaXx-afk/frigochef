@@ -73,17 +73,16 @@ const App: React.FC = () => {
 
   const handleDragEnd = (e: any, { offset, velocity }: any) => {
     const swipe = offset.x;
-    const swipePower = Math.abs(swipe) * velocity.x; // Combine distance and speed
-    const swipeDistanceThreshold = 50;
-    const swipeSpeedThreshold = 10000; // Arbitrary value that feels good
 
-    if (swipe < -swipeDistanceThreshold || swipePower < -swipeSpeedThreshold) {
+    // A deliberate swipe left (distance > 50px) OR a fast flick left (velocity > 500)
+    if (swipe < -60 || velocity.x < -600) {
       // Swipe left -> Next tab
       const currentIndex = TAB_ORDER.indexOf(currentTab);
       if (currentIndex < TAB_ORDER.length - 1) {
         handleTabChange(TAB_ORDER[currentIndex + 1]);
       }
-    } else if (swipe > swipeDistanceThreshold || swipePower > swipeSpeedThreshold) {
+      // A deliberate swipe right OR a fast flick right
+    } else if (swipe > 60 || velocity.x > 600) {
       // Swipe right -> Previous tab
       const currentIndex = TAB_ORDER.indexOf(currentTab);
       if (currentIndex > 0) {
@@ -242,7 +241,7 @@ const App: React.FC = () => {
             dragElastic={0.6}
             dragDirectionLock
             onDragEnd={handleDragEnd}
-            className="w-full h-full absolute inset-0 overflow-y-auto overflow-x-hidden pt-4 pb-20"
+            className="w-full h-full absolute inset-0"
           >
             {currentTab === AppTab.INVENTORY && <Inventory ingredients={ingredients} setIngredients={setIngredients} />}
             {currentTab === AppTab.SHOPPING && (

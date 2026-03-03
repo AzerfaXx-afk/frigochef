@@ -250,8 +250,8 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
                 <div className="flex items-center gap-2 shrink-0">
                     {item.expiryDate && (
                         <div className={`text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 shadow-sm border ${isExpired ? 'bg-white dark:bg-slate-900 text-red-600 dark:text-red-400 border-red-100 dark:border-red-900' :
-                                isExpiring ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-900' :
-                                    'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900'
+                            isExpiring ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-900' :
+                                'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900'
                             }`}>
                             {(isExpiring || isExpired) && <AlertTriangle size={10} />}
                             {isExpired ? 'Périmé' : `${daysLeft}j`}
@@ -299,8 +299,8 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
                         <button
                             onClick={() => setSortMode('expiry')}
                             className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all ${sortMode === 'expiry'
-                                    ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm'
-                                    : 'text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                                ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                                : 'text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                                 }`}
                         >
                             <Calendar size={12} /> Date
@@ -308,8 +308,8 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
                         <button
                             onClick={() => setSortMode('category')}
                             className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all ${sortMode === 'category'
-                                    ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm'
-                                    : 'text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                                ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                                : 'text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                                 }`}
                         >
                             <Layers size={12} /> Rayon
@@ -364,8 +364,8 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isScanning}
                             className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-sm ${isScanning
-                                    ? 'bg-slate-100 dark:bg-slate-800 text-emerald-500 border border-emerald-200 dark:border-emerald-800'
-                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95'
+                                ? 'bg-slate-100 dark:bg-slate-800 text-emerald-500 border border-emerald-200 dark:border-emerald-800'
+                                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95'
                                 }`}
                         >
                             {isScanning ? <Loader2 size={20} className="animate-spin" /> : <Camera size={20} />}
@@ -412,8 +412,8 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
                                     key={cat}
                                     onClick={() => setCategory(cat as any)}
                                     className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide whitespace-nowrap transition-colors border flex-shrink-0 ${category === cat
-                                            ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
-                                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'
+                                        ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
+                                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'
                                         }`}
                                 >
                                     {cat === 'produce' ? 'Fruits' :
@@ -439,7 +439,7 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
             </div>
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto p-4 pb-32 scroll-smooth">
+            <div className="flex-1 overflow-y-auto p-4 pb-8 scroll-smooth">
                 {ingredients.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-slate-400 dark:text-slate-600 animate-in fade-in zoom-in-95 duration-500">
                         <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 text-slate-300 dark:text-slate-500">
