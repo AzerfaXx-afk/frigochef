@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
       react(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['icon.png'],
+        includeAssets: ['icon.png', 'icon.png?v=2'],
         manifest: {
           name: "FrigoChef AI",
           short_name: "FrigoChef",
@@ -25,13 +25,13 @@ export default defineConfig(({ mode }) => {
           orientation: "portrait",
           icons: [
             {
-              src: "/icon.png",
+              src: "/icon.png?v=2",
               sizes: "192x192",
               type: "image/png",
               purpose: "any maskable"
             },
             {
-              src: "/icon.png",
+              src: "/icon.png?v=2",
               sizes: "512x512",
               type: "image/png",
               purpose: "any maskable"

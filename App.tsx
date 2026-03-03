@@ -125,14 +125,14 @@ const App: React.FC = () => {
         if (registration) {
           registration.showNotification(title, {
             body: body,
-            icon: '/icon.png',
-            badge: '/icon.png',
+            icon: '/icon.png?v=2',
+            badge: '/icon.png?v=2',
             // @ts-ignore
             vibrate: [200, 100, 200],
             tag: 'fc-notif-' + Date.now()
           });
         } else {
-          new Notification(title, { body, icon: '/icon.png' });
+          new Notification(title, { body, icon: '/icon.png?v=2' });
         }
       } catch (e) {
         console.error("Erreur envoi notif système:", e);
