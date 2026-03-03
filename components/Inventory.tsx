@@ -319,22 +319,22 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
             </div>
 
             {/* Add Item Bar */}
-            <div className="p-4 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 flex-shrink-0 z-10 transition-colors duration-300">
-                <div className="flex gap-2 mb-3">
-                    <div className="flex-1 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center px-3 focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-emerald-500 transition-all h-12">
+            <div className="p-3 sm:p-4 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 flex-shrink-0 z-10 transition-colors duration-300">
+                <div className="flex gap-1.5 sm:gap-2 mb-3">
+                    <div className="flex-1 min-w-0 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center px-2 sm:px-3 focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-emerald-500 transition-all h-12">
                         <input
                             type="text"
                             placeholder="Produit (ex: Oeufs)"
-                            className="flex-1 bg-transparent outline-none text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 font-medium"
+                            className="flex-1 min-w-0 bg-transparent outline-none text-[13px] sm:text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 font-medium"
                             value={newItem}
                             onChange={(e) => setNewItem(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && addIngredient()}
                         />
-                        <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
+                        <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1.5 sm:mx-2 shrink-0"></div>
                         <input
                             type="text"
                             placeholder="Qté"
-                            className="w-16 bg-transparent outline-none text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 font-medium"
+                            className="w-10 sm:w-16 min-w-0 bg-transparent outline-none text-[13px] sm:text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 font-medium text-center sm:text-left"
                             value={newQuantity}
                             onChange={(e) => setNewQuantity(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && addIngredient()}
