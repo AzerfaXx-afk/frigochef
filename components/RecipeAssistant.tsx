@@ -82,7 +82,6 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
     ]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [useSearch, setUseSearch] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
     const [isPlayingAudio, setIsPlayingAudio] = useState(false);
     const [isAutoPlay, setIsAutoPlay] = useState(true);
@@ -435,7 +434,8 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
                 let allFunctionCalls: any[] = [];
                 let groundingUrls: string[] = [];
 
-                const stream = chatWithChefStream(history, userMsg.text, ingredients, shoppingList, useSearch);
+                // Remove the useSearch parameter as the feature has been removed
+                const stream = chatWithChefStream(history, userMsg.text, ingredients, shoppingList, false);
 
                 for await (const chunk of stream) {
                     const textChunk = chunk.text;
@@ -664,15 +664,8 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
                 {/* TOOLBAR: Mode Switcher & Web Toggle */}
                 <div className="flex items-center justify-between px-4 pt-3 pb-1">
 
-                    {/* Web Toggle */}
-                    <button
-                        type="button"
-                        onClick={() => setUseSearch(!useSearch)}
-                        className={`p-2 rounded-full border shadow-sm transition-all cursor-pointer flex items-center justify-center ${useSearch ? 'bg-blue-500 border-blue-600 text-white' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:text-blue-500'}`}
-                        title="Recherche Web"
-                    >
-                        <Globe size={16} />
-                    </button>
+                    {/* Space explicitly reserved for balance (was Web Toggle) */}
+                    <div className="w-8"></div>
 
                     {/* Mode Navigator */}
                     <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-full p-1 shadow-inner">
