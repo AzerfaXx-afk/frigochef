@@ -96,6 +96,11 @@ const App: React.FC = () => {
     // 2. Envoyer la notification Système (Push OS)
     if (notificationsEnabled && "Notification" in window && Notification.permission === "granted") {
       try {
+        // Vibrate the phone if it is currently being used (foreground)
+        if ("vibrate" in navigator) {
+          navigator.vibrate([200, 100, 200]);
+        }
+
         const registration = await navigator.serviceWorker.getRegistration();
         if (registration) {
           registration.showNotification(title, {
@@ -107,7 +112,8 @@ const App: React.FC = () => {
             tag: 'fc-notif-' + Date.now()
           });
         } else {
-          new Notification(title, { body, icon: '/icon.png?v=2' });
+          // @ts-ignore - TS sometimes forgets vibrate exists on new Notification
+          new Notification(title, { body, icon: '/icon.png?v=2', vibrate: [200, 100, 200] });
         }
       } catch (e) {
         console.error("Erreur envoi notif système:", e);
