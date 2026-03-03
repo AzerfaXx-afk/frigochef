@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Ingredient } from '../types';
 import { Plus, Trash2, AlertTriangle, Apple, Beef, Wine, Soup, Search, Package, Clock, ChevronRight, ChevronLeft, Pencil, Check, X, Layers, Calendar, Camera, Loader2 } from 'lucide-react';
-import { scanIngredientsFromImage, base64ToBytes } from '../services/geminiService';
+import { scanIngredientsFromImage } from '../services/geminiService';
 
 interface Props {
     ingredients: Ingredient[];

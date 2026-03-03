@@ -8,6 +8,7 @@ import Profile from './components/Profile';
 import Carnet from './components/Carnet';
 import InteractiveOnboarding from './components/InteractiveOnboarding';
 import { LayoutGrid, ShoppingCart, ChefHat, User, BookOpen } from 'lucide-react';
+import { ChatMessage } from './types';
 
 // --- FONCTION UTILITAIRE CATÉGORIES ---
 const detectCategory = (name: string): Ingredient['category'] => {
@@ -38,6 +39,23 @@ const App: React.FC = () => {
     try { const saved = localStorage.getItem('fc_profile'); return saved ? JSON.parse(saved) : { name: 'Chef' }; } catch { return { name: 'Chef' }; }
   });
   const [streak, setStreak] = useState(() => parseInt(localStorage.getItem('fc_streak_count') || '0'));
+
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('fc_chat_messages');
+      return saved ? JSON.parse(saved) : [{
+        id: '0',
+        role: 'model',
+        text: "Salut Chef ! 👨‍🍳\nJe gère ton stock, ta liste et tes recettes. Par quoi on commence ?"
+      }];
+    } catch {
+      return [{
+        id: '0',
+        role: 'model',
+        text: "Salut Chef ! 👨‍🍳\nJe gère ton stock, ta liste et tes recettes. Par quoi on commence ?"
+      }];
+    }
+  });
 
   // --- GESTION CENTRALISÉE DES NOTIFICATIONS ---
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
@@ -79,12 +97,12 @@ const App: React.FC = () => {
   };
 
 
-  // --- SAUVEGARDES ---
   useEffect(() => { localStorage.setItem('fc_ingredients', JSON.stringify(ingredients)); }, [ingredients]);
   useEffect(() => { localStorage.setItem('fc_shopping', JSON.stringify(shoppingList)); }, [shoppingList]);
   useEffect(() => { localStorage.setItem('fc_recipes', JSON.stringify(savedRecipes)); }, [savedRecipes]);
   useEffect(() => { localStorage.setItem('fc_notifications', JSON.stringify(notifications)); }, [notifications]);
   useEffect(() => { localStorage.setItem('fc_notifs_active', JSON.stringify(notificationsEnabled)); }, [notificationsEnabled]);
+  useEffect(() => { localStorage.setItem('fc_chat_messages', JSON.stringify(chatMessages)); }, [chatMessages]);
 
   useEffect(() => {
     if (darkMode) document.documentElement.classList.add('dark');
@@ -235,6 +253,7 @@ const App: React.FC = () => {
               <ShoppingList
                 items={shoppingList}
                 setItems={setShoppingList}
+                ingredients={ingredients}
                 onAddToStock={(items) => {
                   setIngredients(prev => [...prev, ...items.map(i => ({
                     id: Date.now().toString() + Math.random(),
@@ -244,7 +263,16 @@ const App: React.FC = () => {
               />
             )}
             {currentTab === AppTab.ASSISTANT && (
-              <RecipeAssistant ingredients={ingredients} setIngredients={setIngredients} setSavedRecipes={setSavedRecipes} shoppingList={shoppingList} setShoppingList={setShoppingList} isActive={currentTab === AppTab.ASSISTANT} />
+              <RecipeAssistant
+                ingredients={ingredients}
+                setIngredients={setIngredients}
+                setSavedRecipes={setSavedRecipes}
+                shoppingList={shoppingList}
+                setShoppingList={setShoppingList}
+                isActive={currentTab === AppTab.ASSISTANT}
+                messages={chatMessages}
+                setMessages={setChatMessages}
+              />
             )}
             {currentTab === AppTab.CARNET && <Carnet savedRecipes={savedRecipes} setSavedRecipes={setSavedRecipes} />}
             {currentTab === AppTab.PROFILE && (

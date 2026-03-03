@@ -2,12 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage, Ingredient, Recipe, ShoppingItem } from '../types';
 import {
     chatWithChefStream,
-    generateRecipePlan,
-    generateSpeech,
-    base64ToBytes,
-    pcmToAudioBuffer
+    generateRecipePlan
 } from '../services/geminiService';
-import { Mic, Send, Bot, Sparkles, Volume2, VolumeX, Globe, Loader2, StopCircle, ChefHat, X, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Mic, Send, Bot, Sparkles, Volume2, VolumeX, Globe, Loader2, StopCircle, ChefHat, X, AlertTriangle, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 
 interface Props {
     ingredients: Ingredient[];
@@ -16,6 +13,8 @@ interface Props {
     shoppingList: ShoppingItem[];
     setShoppingList: React.Dispatch<React.SetStateAction<ShoppingItem[]>>;
     isActive: boolean;
+    messages: ChatMessage[];
+    setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
 }
 
 const FormattedText: React.FC<{ text: string }> = ({ text }) => {
@@ -69,17 +68,20 @@ const SUGGESTION_MODES = [
             "Recette végétarienne simple",
             "Qu'est-ce que je peux cuisiner ?"
         ]
+    },
+    {
+        id: 'plan',
+        label: 'Planifier',
+        icon: '📅',
+        prompts: [
+            "Fais-moi un plan de repas pour 4 jours pour 2 personnes",
+            "Génère un menu de la semaine avec 50 euros de budget",
+            "Meal prep végétarien pour 3 repas"
+        ]
     }
 ];
 
-const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSavedRecipes, shoppingList, setShoppingList, isActive }) => {
-    const [messages, setMessages] = useState<ChatMessage[]>([
-        {
-            id: '0',
-            role: 'model',
-            text: "Salut Chef ! 👨‍🍳\nJe gère ton stock, ta liste et tes recettes. Par quoi on commence ?"
-        }
-    ]);
+const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSavedRecipes, shoppingList, setShoppingList, isActive, messages, setMessages }) => {
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
@@ -98,11 +100,7 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    // Audio Queue State
-    const audioQueueRef = useRef<Promise<AudioBuffer | null>[]>([]);
-    const isPlayingQueueRef = useRef(false);
-    const audioContextRef = useRef<AudioContext | null>(null);
-
+    // Audio Queue State (Native SpeechSynthesis)
     const isAutoPlayRef = useRef(isAutoPlay);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -165,18 +163,22 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
     useEffect(() => {
         isAutoPlayRef.current = isAutoPlay;
         if (!isAutoPlay) {
-            audioQueueRef.current = [];
-            if (audioContextRef.current && audioContextRef.current.state === 'running') {
-                audioContextRef.current.suspend();
+            // Cut off speech instantly if user mutes
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
             }
             setIsPlayingAudio(false);
-            isPlayingQueueRef.current = false;
-        } else {
-            if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-                audioContextRef.current.resume();
-            }
         }
     }, [isAutoPlay]);
+
+    // Cleanup speech on unmount
+    useEffect(() => {
+        return () => {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+        };
+    }, []);
 
     // --- Audio Recording & Transcription Setup (Web Speech API) ---
     useEffect(() => {
@@ -243,6 +245,14 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
         }
     };
 
+    const clearHistory = () => {
+        setMessages([{
+            id: Date.now().toString(),
+            role: 'model',
+            text: "Salut Chef ! 👨‍🍳\nJ'ai effacé notre historique. On recommence sur de bonnes bases. Que veux-tu faire ?"
+        }]);
+    };
+
     // --- Tool Execution Logic ---
     const handleToolCall = async (name: string, args: any) => {
         if (name === 'ajouterAuStock') {
@@ -294,6 +304,18 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
             return { added: itemsToAdd };
         }
 
+        if (name === 'retirerDuPanier') {
+            const itemsToRemove = (args.items || []) as string[];
+            const normalizedToRemove = itemsToRemove.map(i => i.toLowerCase());
+
+            setShoppingList(prev => prev.filter(item => {
+                // Return explicitly those that do NOT match any of the items to remove
+                const isMatch = normalizedToRemove.some(rem => item.name.toLowerCase().includes(rem));
+                return !isMatch;
+            }));
+            return { removed: itemsToRemove };
+        }
+
         if (name === 'sauvegarderRecette') {
             const newRecipe: Recipe = {
                 id: Date.now().toString(),
@@ -307,81 +329,78 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
             setSavedRecipes(prev => [newRecipe, ...prev]);
             return newRecipe;
         }
+
+        if (name === 'genererPlanSemaine') {
+            const planMeals = args.meals || [];
+            const planShoppingList = args.shoppingList || [];
+
+            // Add missing items to shopping list
+            if (planShoppingList.length > 0) {
+                const newShoppingItems: ShoppingItem[] = planShoppingList.map((itemName: string) => ({
+                    id: Date.now().toString() + Math.random(),
+                    name: itemName,
+                    checked: false
+                }));
+                setShoppingList(prev => [...prev, ...newShoppingItems]);
+            }
+
+            return {
+                plan: planMeals,
+                shoppingListAdded: planShoppingList
+            };
+        }
+
         return null;
     };
 
-    const initAudioContext = () => {
-        if (!audioContextRef.current) {
-            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-        }
-        if (audioContextRef.current.state === 'suspended' && isAutoPlayRef.current) {
-            audioContextRef.current.resume();
-        }
-        return audioContextRef.current;
-    };
-
-    const processAudioQueue = async () => {
-        if (!isAutoPlayRef.current || isPlayingQueueRef.current || audioQueueRef.current.length === 0 || !audioContextRef.current) {
-            if (audioQueueRef.current.length === 0) setIsPlayingAudio(false);
-            return;
-        }
-
-        setIsPlayingAudio(true);
-        isPlayingQueueRef.current = true;
-
-        try {
-            const audioTask = audioQueueRef.current[0];
-            const buffer = await audioTask;
-
-            if (!isAutoPlayRef.current) {
-                audioQueueRef.current = [];
-                isPlayingQueueRef.current = false;
-                setIsPlayingAudio(false);
-                return;
-            }
-
-            audioQueueRef.current.shift();
-
-            if (buffer) {
-                const source = audioContextRef.current.createBufferSource();
-                source.buffer = buffer;
-                source.connect(audioContextRef.current.destination);
-                source.onended = () => {
-                    isPlayingQueueRef.current = false;
-                    processAudioQueue();
-                };
-                source.start(0);
-            } else {
-                isPlayingQueueRef.current = false;
-                processAudioQueue();
-            }
-        } catch (error) {
-            console.error("Error processing audio queue", error);
-            audioQueueRef.current.shift();
-            isPlayingQueueRef.current = false;
-            processAudioQueue();
-        }
-    };
-
     const queueAudioChunk = (text: string) => {
-        if (!isAutoPlayRef.current || !text.trim()) return;
+        if (!isAutoPlayRef.current || !text.trim() || !('speechSynthesis' in window)) return;
 
-        const audioTask = (async () => {
-            try {
-                const base64Audio = await generateSpeech(text);
-                if (!base64Audio) return null;
+        // Clean up markdown specifically for TTS reading (remove asterisks)
+        const cleanText = text.replace(/\*\*/g, '').replace(/\*/g, '').trim();
+        if (!cleanText) return;
 
-                const ctx = initAudioContext();
-                const bytes = base64ToBytes(base64Audio);
-                return pcmToAudioBuffer(bytes, ctx, 24000);
-            } catch (e) {
-                console.warn("TTS Gen failed for chunk", e);
-                return null;
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.lang = 'fr-FR';
+
+        // Try to select a "premium" or "natural" sounding voice if available
+        const voices = window.speechSynthesis.getVoices();
+        const frenchVoices = voices.filter(v => v.lang.startsWith('fr'));
+        const bestVoice = frenchVoices.find(v =>
+            v.name.toLowerCase().includes('premium') ||
+            v.name.toLowerCase().includes('google') ||
+            v.name.toLowerCase().includes('natural') ||
+            v.name.toLowerCase().includes('online') ||
+            v.name.includes('Thomas') ||
+            v.name.includes('Marie') ||
+            v.name.includes('Audrey') ||
+            v.name.includes('Aurelie')
+        ) || frenchVoices[0];
+
+        if (bestVoice) {
+            utterance.voice = bestVoice;
+        }
+
+        utterance.rate = 1.05; // Slightly slower than 1.1 for better natural pronunciation
+        utterance.pitch = 1.0;
+
+        utterance.onstart = () => {
+            setIsPlayingAudio(true);
+        };
+
+        utterance.onend = () => {
+            // Check if this was the last utterance in the queue
+            if (!window.speechSynthesis.pending) {
+                setIsPlayingAudio(false);
             }
-        })();
+        };
 
-        audioQueueRef.current.push(audioTask);
-        processAudioQueue();
+        utterance.onerror = (e) => {
+            console.warn("Speech synthesis error", e);
+            if (!window.speechSynthesis.pending) setIsPlayingAudio(false);
+        };
+
+        window.speechSynthesis.speak(utterance);
     };
 
     const handleSend = async (manualText?: string) => {
@@ -390,24 +409,15 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
 
         setErrorMsg(null);
 
-        // CRITICAL: Initialize/Resume Audio Context on user gesture to avoid mobile delays
-        if (isAutoPlayRef.current) {
-            const ctx = initAudioContext();
-            if (ctx.state === 'suspended') ctx.resume();
-        }
-
         const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: textToSend };
         setMessages(prev => [...prev, userMsg]);
         setInputValue('');
         setIsLoading(true);
 
-        // Clear previous audio queue if interrupting
-        audioQueueRef.current = [];
-        if (isPlayingQueueRef.current && audioContextRef.current) {
-            audioContextRef.current.suspend().then(() => {
-                audioContextRef.current?.resume();
-                isPlayingQueueRef.current = false;
-            });
+        // Clear previous native audio queue if interrupting
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            setIsPlayingAudio(false);
         }
 
         try {
@@ -532,10 +542,23 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
                                 toolOutput += `\n\n🛒 Ajouté liste : **${items}**.`;
                                 queueAudioChunk("J'ai ajouté ça à votre liste de courses.");
                                 setModeIndex(0); // Force Shopping List Mode
+                            } else if (call.name === 'retirerDuPanier') {
+                                const items = result.removed.join(', ');
+                                toolOutput += `\n\n🗑️ Retiré liste : **${items}**.`;
+                                queueAudioChunk("J'ai retiré ces articles de votre liste de courses.");
+                                setModeIndex(0); // Force Shopping List Mode
                             } else if (call.name === 'sauvegarderRecette') {
                                 toolOutput += `\n\n📖 Recette **${result.title}** sauvegardée !`;
                                 queueAudioChunk("J'ai sauvegardé cette recette.");
                                 setModeIndex(2); // Stay on Cooking Mode
+                            } else if (call.name === 'genererPlanSemaine') {
+                                toolOutput += `\n\n📅 **Plan de la semaine généré !**\n\n`;
+                                result.plan.forEach((meal: any) => {
+                                    toolOutput += `- **${meal.day} (${meal.type})** : ${meal.recipeName}\n`;
+                                });
+                                toolOutput += `\n🛒 **${result.shoppingListAdded.length} articles ajoutés** à votre liste de courses.`;
+                                queueAudioChunk("J'ai généré votre plan de la semaine et ajouté ce qu'il vous manquait à votre liste de courses.");
+                                setModeIndex(0); // Switch to Shopping view
                             }
                         }
                     }
@@ -582,13 +605,23 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
                     </div>
                 </div>
 
-                <button
-                    type="button"
-                    onClick={() => setIsAutoPlay(!isAutoPlay)}
-                    className={`p-2.5 rounded-xl transition-all cursor-pointer ${isAutoPlay ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-400 hover:text-slate-600'}`}
-                >
-                    {isAutoPlay ? <Volume2 size={20} /> : <VolumeX size={20} />}
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={clearHistory}
+                        title="Effacer l'historique"
+                        className="p-2.5 rounded-xl transition-all cursor-pointer bg-slate-50 dark:bg-slate-700 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                    >
+                        <Trash2 size={18} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setIsAutoPlay(!isAutoPlay)}
+                        className={`p-2.5 rounded-xl transition-all cursor-pointer ${isAutoPlay ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-400 hover:text-slate-600'}`}
+                    >
+                        {isAutoPlay ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                    </button>
+                </div>
             </div>
 
             {/* Chat Area */}

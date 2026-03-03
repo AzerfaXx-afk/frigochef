@@ -1,5 +1,6 @@
+/// <reference types="vite/client" />
 import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
-import { Ingredient, ShoppingItem } from "../types";
+import { Ingredient, ShoppingItem, MissingIngredientResult, WeeklyPlan } from "../types";
 
 // 1. Initialisation
 const ai = new GoogleGenAI({
@@ -58,6 +59,60 @@ Chaque objet dans le tableau doit avoir cette structure exacte :
     }
 };
 
+export const scanRecipeAndDetectMissing = async (base64Image: string, currentStockText: string): Promise<MissingIngredientResult[]> => {
+    try {
+        const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: [
+                {
+                    role: 'user',
+                    parts: [
+                        {
+                            text: `Tu es un chef et gestionnaire de courses. Je te donne une photo d'une recette (page de magazine, livre, écran, etc.) et la liste de ce que j'ai déjà dans mon frigo.
+                            
+STOCK ACTUEL:
+${currentStockText || 'Le frigo est vide.'}
+
+TA MISSION:
+1. Lis les ingrédients nécessaires sur la photo de la recette (ou devine-les si c'est la photo du plat final).
+2. Compare avec le STOCK ACTUEL.
+3. Déduis uniquement ce qu'il MANQUE pour réaliser cette recette.
+4. Renvoie le résultat au format JSON strict.
+
+Règles strictes de sortie :
+1. Renvoie UNIQUEMENT un tableau JSON valide contenant les ingrédients MANQUANTS. Si rien ne manque, renvoie [].
+2. N'ajoute AUCUN texte avant ou après le JSON.
+3. N'utilise pas de backticks \`\`\`json ou autres marqueurs de code.
+
+Format exigé pour chaque objet :
+{
+  "name": "Nom du produit (ex: Courgette)",
+  "quantity": "Quantité (ex: 2 ou 500g)"
+}`
+                        },
+                        { inlineData: { data: base64Image, mimeType: 'image/jpeg' } }
+                    ]
+                }
+            ],
+            config: {
+                temperature: 0.1,
+            }
+        });
+
+        const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+        const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const parsedMissing = JSON.parse(cleanText);
+
+        if (Array.isArray(parsedMissing)) {
+            return parsedMissing;
+        }
+        return [];
+    } catch (e) {
+        console.error("Erreur Scan Magique:", e);
+        throw new Error("Impossible d'analyser la recette.");
+    }
+};
+
 // --- DÉFINITION DES OUTILS ---
 
 const addToStockTool: FunctionDeclaration = {
@@ -98,6 +153,21 @@ const removeFromStockTool: FunctionDeclaration = {
     }
 };
 
+const removeFromShoppingListTool: FunctionDeclaration = {
+    name: 'retirerDuPanier',
+    description: "Retirer ou supprimer des articles de la liste de courses. Ex: 'Enlève le lait de ma liste'.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            items: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING, description: "Nom exact ou partiel de l'article à supprimer de la liste de courses" }
+            }
+        },
+        required: ['items']
+    }
+};
+
 const addToShoppingListTool: FunctionDeclaration = {
     name: 'ajouterAuPanier',
     description: "Ajouter à la liste de courses. Ex: 'Il faut acheter du beurre'.",
@@ -129,7 +199,35 @@ const saveRecipeTool: FunctionDeclaration = {
     }
 };
 
-const tools = [addToStockTool, removeFromStockTool, addToShoppingListTool, saveRecipeTool];
+const genererPlanSemaineTool: FunctionDeclaration = {
+    name: 'genererPlanSemaine',
+    description: "Générer un plan de repas pour la semaine (Meal Prep) avec recettes et liste de courses. Ex: 'Fais moi un plan pour 4 jours pour 2 personnes sans gluten avec 50 euros'.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            meals: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        day: { type: Type.STRING, description: "Jour. Ex: 'Lundi'" },
+                        type: { type: Type.STRING, description: "Repas. Ex: 'Dîner'" },
+                        recipeName: { type: Type.STRING, description: "Nom complet de la recette proposée." }
+                    },
+                    required: ['day', 'type', 'recipeName']
+                }
+            },
+            shoppingList: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "Liste consolidée des articles manquants à acheter pour tout le plan (en vérifiant le stock)."
+            }
+        },
+        required: ['meals', 'shoppingList']
+    }
+};
+
+const tools = [addToStockTool, removeFromStockTool, addToShoppingListTool, removeFromShoppingListTool, saveRecipeTool, genererPlanSemaineTool];
 
 // --- FONCTION PRINCIPALE ---
 
@@ -144,15 +242,17 @@ export const chatWithChefStream = async function* (
         const inventoryText = ingredients.map(i => `${i.quantity} ${i.name}`).join(', ') || 'Vide';
         const shoppingText = shoppingList.map(i => i.name).join(', ') || 'Vide';
 
-        const systemInstruction = `Tu es FrigoChef AI, assistant culinaire expert.
+        const systemInstruction = `Tu es FrigoChef AI, assistant culinaire expert interactif.
     CONTEXTE ACTUEL :
     - STOCK FRIGO : ${inventoryText}
     - LISTE COURSES : ${shoppingText}
     
-    RÈGLES :
-    - Si on te demande une recette, vérifie le stock.
-    - Utilise les outils pour modifier le stock ou la liste si l'utilisateur le demande explicitement.
-    - Sois concis et utile.`;
+    RÈGLES IMPORTANTES :
+    - Si on te demande de créer un "plan pour la semaine", du "Meal Prep" ou un "menu de la semaine", tu DOIS utiliser l'outil \`genererPlanSemaine\`. Remplis-le intelligemment en considérant les préférences (budget, allergies, etc.) mentionnées par l'utilisateur.
+    - Si on te demande une recette individuelle, invente ou propose une recette en utilisant au maximum le stock actuel.
+    - Tu as un contrôle TOTAL sur l'application. Utilise les outils (\`ajouterAuStock\`, \`retirerDuStock\`, \`ajouterAuPanier\`, \`retirerDuPanier\`, \`sauvegarderRecette\`) PÈS qu'on te donne un ordre correspondant. Ex: "enlève les pâtes de la liste" -> appele \`retirerDuPanier\`.
+    - Quand tu crées un plan de semaine, assure-toi d'inclure dans la \`shoppingList\` uniquement les articles qui ne sont pas déjà dans le STOCK FRIGO. Ton plan doit pouvoir subvenir au nombre de personnes demandé.
+    - Sois expressif et concis, tu t'adresses à voix haute à l'utilisateur. Parle comme un chef passionné.`;
 
         // Préparation de l'historique
         const contents = history.map(msg => {
@@ -238,6 +338,8 @@ export const chatWithChefStream = async function* (
             msg = "Clé API invalide ou expirée.";
         } else if (error.message?.includes("400")) {
             msg = "Erreur de format (400). Essayez de rafraîchir.";
+        } else if (error.message?.includes("429") || error.message?.includes("exceeded")) {
+            msg = "⏳ Quota IA dépassé ! Attendez quelques secondes ou passez sur un plan Premium pour des requêtes illimitées.";
         }
 
         yield { text: msg };
@@ -257,9 +359,3 @@ export const generateRecipePlan = async (ingredients: Ingredient[], request: str
         return text || "Impossible de générer le plan.";
     } catch (e) { return "Erreur lors de la génération."; }
 };
-
-export const generateSpeech = async (text: string) => null;
-export const playTextAsAudio = async () => { };
-export const base64ToBytes = (base64: string) => new Uint8Array();
-export const startLiveTranscription = async (...args: any[]) => null;
-export const pcmToAudioBuffer = (...args: any[]) => null;

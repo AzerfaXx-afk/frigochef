@@ -31,7 +31,7 @@ export interface Recipe {
   createdAt: number;
   isFavorite?: boolean;
   isPinned?: boolean;
-  isDeleted?: boolean; 
+  isDeleted?: boolean;
 }
 
 export interface ChatMessage {
@@ -58,10 +58,27 @@ export enum AppTab {
 
 // AJOUTÉ POUR LE SYSTÈME DE NOTIFICATIONS
 export interface AppNotification {
-    id: number;
-    title: string;
-    message: string;
-    time: string;
-    read: boolean;
-    type: 'system' | 'expiry' | 'streak' | 'info';
+  id: number;
+  title: string;
+  message: string;
+  time: string;
+  read: boolean;
+  type: 'system' | 'expiry' | 'streak' | 'info';
+}
+
+// AJOUTÉ POUR LES FONCTIONNALITÉS PREMIUM
+export interface MissingIngredientResult {
+  name: string;
+  quantity: string;
+}
+
+export interface Meal {
+  day: string; // Lundi, Mardi...
+  type: 'Déjeuner' | 'Dîner';
+  recipeName: string;
+}
+
+export interface WeeklyPlan {
+  meals: Meal[];
+  shoppingList: string[]; // Liste consolidée de tous les ingrédients manquants pour la semaine
 }
