@@ -78,15 +78,17 @@ const App: React.FC = () => {
 
   const handleDragEnd = (e: any, { offset, velocity }: any) => {
     const swipe = offset.x;
-    const swipeThreshold = 50;
+    const swipePower = Math.abs(swipe) * velocity.x; // Combine distance and speed
+    const swipeDistanceThreshold = 50;
+    const swipeSpeedThreshold = 10000; // Arbitrary value that feels good
 
-    if (swipe < -swipeThreshold) {
+    if (swipe < -swipeDistanceThreshold || swipePower < -swipeSpeedThreshold) {
       // Swipe left -> Next tab
       const currentIndex = TAB_ORDER.indexOf(currentTab);
       if (currentIndex < TAB_ORDER.length - 1) {
         handleTabChange(TAB_ORDER[currentIndex + 1]);
       }
-    } else if (swipe > swipeThreshold) {
+    } else if (swipe > swipeDistanceThreshold || swipePower > swipeSpeedThreshold) {
       // Swipe right -> Previous tab
       const currentIndex = TAB_ORDER.indexOf(currentTab);
       if (currentIndex > 0) {
@@ -228,7 +230,7 @@ const App: React.FC = () => {
   }, [notificationsEnabled, ingredients]); // Dépendances pour relancer si besoin
 
   return (
-    <div className="h-full w-full flex flex-col max-w-md mx-auto bg-slate-50 dark:bg-slate-900 shadow-2xl overflow-hidden relative border-x border-slate-200 dark:border-slate-800 transition-colors duration-300">
+    <div className="h-[100dvh] w-full flex flex-col max-w-md mx-auto bg-slate-50 dark:bg-slate-900 shadow-2xl overflow-hidden relative border-x border-slate-200 dark:border-slate-800 transition-colors duration-300">
 
       {/* CONTENU PRINCIPAL */}
       <div className="flex-1 overflow-hidden relative bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 touch-pan-y">
@@ -239,12 +241,13 @@ const App: React.FC = () => {
             initial={(direction) => ({ opacity: 0, x: direction * 50 })}
             animate={{ opacity: 1, x: 0 }}
             exit={(direction) => ({ opacity: 0, x: direction * -50 })}
-            transition={{ duration: 0.25, ease: "easeOut" }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.2}
+            dragDirectionLock
             onDragEnd={handleDragEnd}
-            className="w-full h-full absolute inset-0 overflow-y-auto overflow-x-hidden"
+            className="w-full h-full absolute inset-0 overflow-y-auto overflow-x-hidden pt-4 pb-20"
           >
             {currentTab === AppTab.INVENTORY && <Inventory ingredients={ingredients} setIngredients={setIngredients} />}
             {currentTab === AppTab.SHOPPING && (
