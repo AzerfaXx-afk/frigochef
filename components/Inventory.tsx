@@ -363,12 +363,12 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
                         <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isScanning}
-                            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-sm ${isScanning
+                            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-md group ${isScanning
                                 ? 'bg-slate-100 dark:bg-slate-800 text-emerald-500 border border-emerald-200 dark:border-emerald-800'
-                                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95'
+                                : 'bg-gradient-to-br from-teal-400 to-emerald-500 text-white hover:shadow-lg hover:from-teal-500 hover:to-emerald-600 active:scale-95 border border-emerald-400/50'
                                 }`}
                         >
-                            {isScanning ? <Loader2 size={20} className="animate-spin" /> : <Camera size={20} />}
+                            {isScanning ? <Loader2 size={20} className="animate-spin" /> : <Camera size={22} className="group-hover:scale-110 transition-transform" />}
                         </button>
                     </div>
                 </div>

@@ -55,7 +55,6 @@ const App: React.FC = () => {
   });
 
   const [currentTab, setCurrentTab] = useState<AppTab>(AppTab.ASSISTANT);
-  const [slideDirection, setSlideDirection] = useState<number>(1);
   const notificationChecked = useRef(false);
 
   // --- LOGIQUE CARROUSEL ---
@@ -63,31 +62,7 @@ const App: React.FC = () => {
 
   const handleTabChange = (newTab: AppTab) => {
     if (newTab !== currentTab) {
-      const currentIndex = TAB_ORDER.indexOf(currentTab);
-      const newIndex = TAB_ORDER.indexOf(newTab);
-      // If we go right in the order (e.g. 0 -> 1), the new page should slide in from the right (positive start x).
-      setSlideDirection(newIndex > currentIndex ? 1 : -1);
       setCurrentTab(newTab);
-    }
-  };
-
-  const handleDragEnd = (e: any, { offset, velocity }: any) => {
-    const swipe = offset.x;
-
-    // A deliberate swipe left (distance > 50px) OR a fast flick left (velocity > 500)
-    if (swipe < -60 || velocity.x < -600) {
-      // Swipe left -> Next tab
-      const currentIndex = TAB_ORDER.indexOf(currentTab);
-      if (currentIndex < TAB_ORDER.length - 1) {
-        handleTabChange(TAB_ORDER[currentIndex + 1]);
-      }
-      // A deliberate swipe right OR a fast flick right
-    } else if (swipe > 60 || velocity.x > 600) {
-      // Swipe right -> Previous tab
-      const currentIndex = TAB_ORDER.indexOf(currentTab);
-      if (currentIndex > 0) {
-        handleTabChange(TAB_ORDER[currentIndex - 1]);
-      }
     }
   };
 
@@ -228,19 +203,13 @@ const App: React.FC = () => {
 
       {/* CONTENU PRINCIPAL */}
       <div className="flex-1 overflow-hidden relative bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 touch-pan-y">
-        <AnimatePresence mode="popLayout" custom={slideDirection}>
+        <AnimatePresence mode="wait">
           <motion.div
             key={currentTab}
-            custom={slideDirection}
-            initial={(direction) => ({ opacity: 0, x: direction * 100 + "%" })}
-            animate={{ opacity: 1, x: 0 }}
-            exit={(direction) => ({ opacity: 0, x: direction * -100 + "%" })}
-            transition={{ type: "spring", stiffness: 350, damping: 35, mass: 1 }}
-            drag="x"
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.6}
-            dragDirectionLock
-            onDragEnd={handleDragEnd}
+            initial={{ opacity: 0, scale: 0.98, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: -10 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
             className="w-full h-full absolute inset-0"
           >
             {currentTab === AppTab.INVENTORY && <Inventory ingredients={ingredients} setIngredients={setIngredients} />}
