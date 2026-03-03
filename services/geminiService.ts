@@ -258,8 +258,8 @@ export const generateRecipePlan = async (ingredients: Ingredient[], request: str
     } catch (e) { return "Erreur lors de la génération."; }
 };
 
-export const generateSpeech = async () => null;
+export const generateSpeech = async (text: string) => null;
 export const playTextAsAudio = async () => { };
-export const base64ToBytes = () => new Uint8Array();
-export const startLiveTranscription = async () => null;
-export const pcmToAudioBuffer = () => null;
+export const base64ToBytes = (base64: string) => new Uint8Array();
+export const startLiveTranscription = async (...args: any[]) => null;
+export const pcmToAudioBuffer = (...args: any[]) => null;
