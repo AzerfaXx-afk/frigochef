@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Ingredient } from '../types';
 import { Plus, Trash2, AlertTriangle, Apple, Beef, Wine, Soup, Search, Package, Clock, ChevronRight, ChevronLeft, Pencil, Check, X, Layers, Calendar, Camera, Loader2 } from 'lucide-react';
 import { scanIngredientsFromImage, base64ToBytes } from '../services/geminiService';
@@ -29,7 +29,14 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Sort State
-    const [sortMode, setSortMode] = useState<'expiry' | 'category'>('expiry');
+    const [sortMode, setSortMode] = useState<'expiry' | 'category'>(() => {
+        const saved = localStorage.getItem('fc_sortMode');
+        return (saved as 'expiry' | 'category') || 'expiry';
+    });
+
+    useEffect(() => {
+        localStorage.setItem('fc_sortMode', sortMode);
+    }, [sortMode]);
 
     // Edit State
     const [editingId, setEditingId] = useState<string | null>(null);
