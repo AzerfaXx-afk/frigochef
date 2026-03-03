@@ -55,7 +55,46 @@ const App: React.FC = () => {
   });
 
   const [currentTab, setCurrentTab] = useState<AppTab>(AppTab.ASSISTANT);
+  const [previousTab, setPreviousTab] = useState<AppTab>(AppTab.ASSISTANT);
   const notificationChecked = useRef(false);
+
+  // --- LOGIQUE CARROUSEL ---
+  const TAB_ORDER = [AppTab.INVENTORY, AppTab.SHOPPING, AppTab.ASSISTANT, AppTab.CARNET, AppTab.PROFILE];
+
+  const handleTabChange = (newTab: AppTab) => {
+    if (newTab !== currentTab) {
+      setPreviousTab(currentTab);
+      setCurrentTab(newTab);
+    }
+  };
+
+  const getAnimationDirection = () => {
+    const currentIndex = TAB_ORDER.indexOf(currentTab);
+    const prevIndex = TAB_ORDER.indexOf(previousTab);
+    return currentIndex > prevIndex ? 1 : -1;
+  };
+
+  const animationDirection = getAnimationDirection();
+
+  const handleDragEnd = (e: any, { offset, velocity }: any) => {
+    const swipe = offset.x;
+    const swipeThreshold = 50;
+
+    if (swipe < -swipeThreshold) {
+      // Swipe left -> Next tab
+      const currentIndex = TAB_ORDER.indexOf(currentTab);
+      if (currentIndex < TAB_ORDER.length - 1) {
+        handleTabChange(TAB_ORDER[currentIndex + 1]);
+      }
+    } else if (swipe > swipeThreshold) {
+      // Swipe right -> Previous tab
+      const currentIndex = TAB_ORDER.indexOf(currentTab);
+      if (currentIndex > 0) {
+        handleTabChange(TAB_ORDER[currentIndex - 1]);
+      }
+    }
+  };
+
 
   // --- SAUVEGARDES ---
   useEffect(() => { localStorage.setItem('fc_ingredients', JSON.stringify(ingredients)); }, [ingredients]);
@@ -92,6 +131,7 @@ const App: React.FC = () => {
             body: body,
             icon: '/icon.png',
             badge: '/icon.png',
+            // @ts-ignore
             vibrate: [200, 100, 200],
             tag: 'fc-notif-' + Date.now()
           });
@@ -191,15 +231,20 @@ const App: React.FC = () => {
     <div className="h-full w-full flex flex-col max-w-md mx-auto bg-slate-50 dark:bg-slate-900 shadow-2xl overflow-hidden relative border-x border-slate-200 dark:border-slate-800 transition-colors duration-300">
 
       {/* CONTENU PRINCIPAL */}
-      <div className="flex-1 overflow-hidden relative bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-        <AnimatePresence mode="wait">
+      <div className="flex-1 overflow-hidden relative bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 touch-pan-y">
+        <AnimatePresence mode="popLayout" custom={animationDirection}>
           <motion.div
             key={currentTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-            className="w-full h-full absolute inset-0 overflow-y-auto"
+            custom={animationDirection}
+            initial={(direction) => ({ opacity: 0, x: direction * 50 })}
+            animate={{ opacity: 1, x: 0 }}
+            exit={(direction) => ({ opacity: 0, x: direction * -50 })}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.2}
+            onDragEnd={handleDragEnd}
+            className="w-full h-full absolute inset-0 overflow-y-auto overflow-x-hidden"
           >
             {currentTab === AppTab.INVENTORY && <Inventory ingredients={ingredients} setIngredients={setIngredients} />}
             {currentTab === AppTab.SHOPPING && (
@@ -239,14 +284,14 @@ const App: React.FC = () => {
       </div>
 
       {/* BARRE DE NAVIGATION */}
-      <nav className="bg-white/90 dark:bg-[#0b132b]/95 backdrop-blur-xl px-2 pt-2 pb-safe flex justify-between items-center z-40 h-[88px] shrink-0 border-t border-slate-200 dark:border-slate-800/80">
-        <button onClick={() => setCurrentTab(AppTab.INVENTORY)} className={`flex flex-col items-center gap-1 p-2 w-16 transition-colors ${currentTab === AppTab.INVENTORY ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-300'}`}><LayoutGrid size={24} /><span className="text-[10px]">Stock</span></button>
-        <button onClick={() => setCurrentTab(AppTab.SHOPPING)} className={`flex flex-col items-center gap-1 p-2 w-16 transition-colors ${currentTab === AppTab.SHOPPING ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-300'}`}><ShoppingCart size={24} /><span className="text-[10px]">Liste</span></button>
-        <div className="relative -top-6"><button onClick={() => setCurrentTab(AppTab.ASSISTANT)} className={`w-16 h-16 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${currentTab === AppTab.ASSISTANT ? 'bg-emerald-500 text-white scale-110 shadow-emerald-500/40' : 'bg-white dark:bg-[#1c2541] text-slate-400 hover:scale-105'}`}><ChefHat size={30} /></button></div>
-        <button onClick={() => setCurrentTab(AppTab.CARNET)} className={`flex flex-col items-center gap-1 p-2 w-16 transition-colors ${currentTab === AppTab.CARNET ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-300'}`}><BookOpen size={24} /><span className="text-[10px]">Carnet</span></button>
+      <nav className="bg-white/90 dark:bg-[#0b132b]/95 backdrop-blur-xl px-2 pt-2 pb-safe flex justify-between items-center z-40 h-[88px] shrink-0 border-t border-slate-200 dark:border-slate-800/80 select-none touch-none">
+        <button onClick={() => handleTabChange(AppTab.INVENTORY)} className={`flex flex-col items-center gap-1 p-2 w-16 transition-colors ${currentTab === AppTab.INVENTORY ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-300'}`}><LayoutGrid size={24} /><span className="text-[10px]">Stock</span></button>
+        <button onClick={() => handleTabChange(AppTab.SHOPPING)} className={`flex flex-col items-center gap-1 p-2 w-16 transition-colors ${currentTab === AppTab.SHOPPING ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-300'}`}><ShoppingCart size={24} /><span className="text-[10px]">Liste</span></button>
+        <div className="relative -top-6"><button onClick={() => handleTabChange(AppTab.ASSISTANT)} className={`w-16 h-16 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${currentTab === AppTab.ASSISTANT ? 'bg-emerald-500 text-white scale-110 shadow-emerald-500/40' : 'bg-white dark:bg-[#1c2541] text-slate-400 hover:scale-105'}`}><ChefHat size={30} /></button></div>
+        <button onClick={() => handleTabChange(AppTab.CARNET)} className={`flex flex-col items-center gap-1 p-2 w-16 transition-colors ${currentTab === AppTab.CARNET ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-300'}`}><BookOpen size={24} /><span className="text-[10px]">Carnet</span></button>
 
         {/* BOUTON PROFIL AVEC BADGE GLOBAL */}
-        <button onClick={() => setCurrentTab(AppTab.PROFILE)} className={`flex flex-col items-center gap-1 p-2 w-16 transition-colors ${currentTab === AppTab.PROFILE ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-300'}`}>
+        <button onClick={() => handleTabChange(AppTab.PROFILE)} className={`flex flex-col items-center gap-1 p-2 w-16 transition-colors ${currentTab === AppTab.PROFILE ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-300'}`}>
           <div className="relative">
             <User size={24} />
             {/* LE BADGE DISPARAIT SI UNREADCOUNT == 0 */}
