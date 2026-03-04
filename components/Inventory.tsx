@@ -30,6 +30,14 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
     const [showScannerModal, setShowScannerModal] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Custom Modal State for Duplicates
+    const [duplicateWarning, setDuplicateWarning] = useState<{
+        show: boolean;
+        names: string;
+        pendingItemsToAdd: Partial<Ingredient>[];
+        existingNamesInStock: Set<string>;
+    } | null>(null);
+
     // Sort State
     const [sortMode, setSortMode] = useState<'expiry' | 'category'>(() => {
         const saved = localStorage.getItem('fc_sortMode');
@@ -101,14 +109,6 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
 
         const normalizedNewName = newItem.trim().toLowerCase();
         const existingItem = ingredients.find(i => i.name.toLowerCase() === normalizedNewName);
-
-        if (existingItem) {
-            const confirmMsg = `"${existingItem.name}" est déjà dans votre stock${existingItem.quantity !== '1' ? ` (Qté: ${existingItem.quantity})` : ''}.\n\nVoulez-vous fusionner et additionner les quantités ?`;
-            if (!window.confirm(confirmMsg)) {
-                return; // Annuler l'ajout
-            }
-        }
-
         const itemObj: Partial<Ingredient> = {
             name: newItem,
             quantity: newQuantity || '1',
@@ -116,7 +116,56 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
             category: category,
         };
 
-        const merged = mergeIntoStock(ingredients, [itemObj]);
+        if (existingItem) {
+            setDuplicateWarning({
+                show: true,
+                names: `${existingItem.name}${existingItem.quantity !== '1' ? ` (Qté: ${existingItem.quantity})` : ''}`,
+                pendingItemsToAdd: [itemObj],
+                existingNamesInStock: new Set([normalizedNewName])
+            });
+            return; // Wait for modal action
+        }
+
+        executeAdd([itemObj]);
+    };
+
+    const handleItemsDetected = (items: Partial<Ingredient>[]) => {
+        setShowScannerModal(false);
+        if (!items || items.length === 0) return;
+
+        const existingNamesInStock = new Set(ingredients.map(i => i.name.toLowerCase()));
+        const duplicatedItems = items.filter(ci => ci.name && existingNamesInStock.has(ci.name.toLowerCase()));
+
+        if (duplicatedItems.length > 0) {
+            const names = duplicatedItems.map(d => d.name).join(', ');
+            setDuplicateWarning({
+                show: true,
+                names,
+                pendingItemsToAdd: items,
+                existingNamesInStock
+            });
+            return; // Wait for modal action
+        }
+
+        executeAdd(items);
+    };
+
+    const flexAddToStock = (merge: boolean) => {
+        if (!duplicateWarning) return;
+        let finalItems = duplicateWarning.pendingItemsToAdd;
+
+        if (!merge) {
+            finalItems = finalItems.filter(ci => ci.name && !duplicateWarning.existingNamesInStock.has(ci.name.toLowerCase()));
+        }
+
+        executeAdd(finalItems);
+        setDuplicateWarning(null);
+    };
+
+    const executeAdd = (itemsToAdd: Partial<Ingredient>[]) => {
+        if (itemsToAdd.length === 0) return;
+
+        const merged = mergeIntoStock(ingredients, itemsToAdd);
         setIngredients(merged);
 
         setTimeout(() => {
@@ -128,34 +177,6 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
         setNewItem('');
         setNewQuantity('');
         setExpiryDate('');
-    };
-
-    const handleItemsDetected = (items: Partial<Ingredient>[]) => {
-        setShowScannerModal(false);
-        if (!items || items.length === 0) return;
-
-        const existingNamesInStock = new Set(ingredients.map(i => i.name.toLowerCase()));
-        const duplicatedItems = items.filter(ci => ci.name && existingNamesInStock.has(ci.name.toLowerCase()));
-
-        let itemsToAdd = items;
-
-        if (duplicatedItems.length > 0) {
-            const names = duplicatedItems.map(d => d.name).join(', ');
-            const confirmMsg = `Attention, ces produits détectés sont déjà en stock : ${names}\n\nVoulez-vous fusionner et additionner leurs quantités avec le stock existant ?\n(Cliquez sur "Annuler" pour ignorer les doublons)`;
-            if (!window.confirm(confirmMsg)) {
-                itemsToAdd = itemsToAdd.filter(ci => ci.name && !existingNamesInStock.has(ci.name.toLowerCase()));
-                if (itemsToAdd.length === 0) return;
-            }
-        }
-
-        const merged = mergeIntoStock(ingredients, itemsToAdd);
-        setIngredients(merged);
-
-        setTimeout(() => {
-            setIngredients(currentItems =>
-                currentItems.map(i => ({ ...i, isNew: false }))
-            );
-        }, 3000);
     };
 
     const removeIngredient = (id: string) => {
@@ -539,6 +560,43 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
              cursor: pointer;
           }
       `}</style>
+            {/* DUPLICATE WARNING MODAL */}
+            {duplicateWarning?.show && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 fade-in duration-200 p-6 flex flex-col items-center">
+                        <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mb-4 text-amber-500">
+                            <AlertTriangle size={32} />
+                        </div>
+                        <h3 className="font-bold text-lg text-slate-800 dark:text-white text-center mb-2">Produit existant</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-6">
+                            L'élément suivant est déjà dans votre garde-manger :<br />
+                            <span className="font-bold text-slate-700 dark:text-slate-300 mt-1 block">{duplicateWarning.names}</span>
+                        </p>
+
+                        <div className="w-full flex flex-col gap-3">
+                            <button
+                                onClick={() => flexAddToStock(true)}
+                                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+                            >
+                                <Plus size={18} /> Fusionner les quantités
+                            </button>
+                            <button
+                                onClick={() => flexAddToStock(false)}
+                                className="w-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
+                            >
+                                Ne pas ajouter ce doublon
+                            </button>
+                            <button
+                                onClick={() => setDuplicateWarning(null)}
+                                className="w-full text-slate-400 hover:text-slate-500 font-bold py-2 mt-2 transition-colors text-sm"
+                            >
+                                Annuler
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {showScannerModal && (
                 <ScannerModal
                     onClose={() => setShowScannerModal(false)}

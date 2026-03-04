@@ -29,6 +29,14 @@ const ShoppingList: React.FC<Props> = ({ items, setItems, ingredients, onAddToSt
     const [editItemName, setEditItemName] = useState('');
     const [duplicateError, setDuplicateError] = useState<string | null>(null);
 
+    // Custom Modal State
+    const [duplicateWarning, setDuplicateWarning] = useState<{
+        show: boolean;
+        names: string;
+        pendingItemsToTransfer: ShoppingItem[];
+        existingNamesInStock: Set<string>;
+    } | null>(null);
+
     // Magic Scan State
     const [isScanning, setIsScanning] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -189,22 +197,37 @@ const ShoppingList: React.FC<Props> = ({ items, setItems, ingredients, onAddToSt
 
         if (duplicatedItems.length > 0) {
             const names = duplicatedItems.map(d => d.name).join(', ');
-            const confirmMsg = `Attention, ces produits sont déjà dans votre garde-manger : ${names}\n\nVoulez-vous additionner leurs quantités avec celles existantes ?\n(Cliquez sur "Annuler" pour ajouter uniquement les nouveaux produits)`;
-            if (!window.confirm(confirmMsg)) {
-                // Ne garder que les nouveaux articles
-                itemsToTransfer = itemsToTransfer.filter(ci => !existingNamesInStock.has(ci.name.toLowerCase()));
-                if (itemsToTransfer.length === 0) return; // Si plus rien à ajouter après filtrage
-            }
+            setDuplicateWarning({
+                show: true,
+                names,
+                pendingItemsToTransfer: itemsToTransfer,
+                existingNamesInStock
+            });
+            return; // Wait for modal action
         }
 
-        onAddToStock(itemsToTransfer);
+        executeTransfer(itemsToTransfer);
+    };
+
+    const flexTransferToStock = (merge: boolean) => {
+        if (!duplicateWarning) return;
+        let finalItems = duplicateWarning.pendingItemsToTransfer;
+
+        if (!merge) {
+            finalItems = finalItems.filter(ci => !duplicateWarning.existingNamesInStock.has(ci.name.toLowerCase()));
+        }
+
+        executeTransfer(finalItems);
+        setDuplicateWarning(null);
+    };
+
+    const executeTransfer = (itemsToTransfer: ShoppingItem[]) => {
+        if (itemsToTransfer.length > 0) {
+            onAddToStock(itemsToTransfer);
+        }
 
         // Remove transferred items from list
         setItems(prev => prev.filter(i => {
-            // either it wasn't checked, or it was checked but filtered out as duplicate (so we might want to keep it in the list or remove it?)
-            // actually if they clicked cancel, they didn't transfer it, so it should stay in the shopping list.
-            // However, `i.checked` is true for all items we tried to transfer.
-            // We only want to remove items that are in `itemsToTransfer`.
             return !itemsToTransfer.some(transferred => transferred.id === i.id);
         }));
     };
@@ -483,6 +506,43 @@ const ShoppingList: React.FC<Props> = ({ items, setItems, ingredients, onAddToSt
                         <span className="font-bold text-[15px] pt-0.5 tracking-tight">Ajouter au Stock</span>
                         <Package size={20} className="text-slate-700 dark:text-slate-300" strokeWidth={2.5} />
                     </button>
+                </div>
+            )}
+
+            {/* DUPLICATE WARNING MODAL */}
+            {duplicateWarning?.show && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 fade-in duration-200 p-6 flex flex-col items-center">
+                        <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mb-4 text-amber-500">
+                            <AlertTriangle size={32} />
+                        </div>
+                        <h3 className="font-bold text-lg text-slate-800 dark:text-white text-center mb-2">Produits en double</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-6">
+                            Vous avez déjà ces produits dans votre frigo :<br />
+                            <span className="font-bold text-slate-700 dark:text-slate-300">{duplicateWarning.names}</span>
+                        </p>
+
+                        <div className="w-full flex flex-col gap-3">
+                            <button
+                                onClick={() => flexTransferToStock(true)}
+                                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+                            >
+                                <Plus size={18} /> Additionner les quantités
+                            </button>
+                            <button
+                                onClick={() => flexTransferToStock(false)}
+                                className="w-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
+                            >
+                                Ne garder que la nouveauté
+                            </button>
+                            <button
+                                onClick={() => setDuplicateWarning(null)}
+                                className="w-full text-slate-400 hover:text-slate-500 font-bold py-2 mt-2 transition-colors text-sm"
+                            >
+                                Annuler
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
