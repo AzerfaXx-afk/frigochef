@@ -180,10 +180,33 @@ const ShoppingList: React.FC<Props> = ({ items, setItems, ingredients, onAddToSt
     const checkedItems = items.filter(i => i.checked);
 
     const handleTransferToStock = () => {
-        if (checkedItems.length === 0) return;
-        onAddToStock(checkedItems);
-        // Remove checked items from list
-        setItems(prev => prev.filter(i => !i.checked));
+        let itemsToTransfer = checkedItems;
+        if (itemsToTransfer.length === 0) return;
+
+        // Detection des doublons avec le stock actuel
+        const existingNamesInStock = new Set(ingredients.map(i => i.name.toLowerCase()));
+        const duplicatedItems = itemsToTransfer.filter(ci => existingNamesInStock.has(ci.name.toLowerCase()));
+
+        if (duplicatedItems.length > 0) {
+            const names = duplicatedItems.map(d => d.name).join(', ');
+            const confirmMsg = `Attention, ces produits sont déjà dans votre garde-manger : ${names}\n\nVoulez-vous additionner leurs quantités avec celles existantes ?\n(Cliquez sur "Annuler" pour ajouter uniquement les nouveaux produits)`;
+            if (!window.confirm(confirmMsg)) {
+                // Ne garder que les nouveaux articles
+                itemsToTransfer = itemsToTransfer.filter(ci => !existingNamesInStock.has(ci.name.toLowerCase()));
+                if (itemsToTransfer.length === 0) return; // Si plus rien à ajouter après filtrage
+            }
+        }
+
+        onAddToStock(itemsToTransfer);
+
+        // Remove transferred items from list
+        setItems(prev => prev.filter(i => {
+            // either it wasn't checked, or it was checked but filtered out as duplicate (so we might want to keep it in the list or remove it?)
+            // actually if they clicked cancel, they didn't transfer it, so it should stay in the shopping list.
+            // However, `i.checked` is true for all items we tried to transfer.
+            // We only want to remove items that are in `itemsToTransfer`.
+            return !itemsToTransfer.some(transferred => transferred.id === i.id);
+        }));
     };
 
     return (

@@ -98,6 +98,17 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
 
     const addIngredient = () => {
         if (!newItem.trim()) return;
+
+        const normalizedNewName = newItem.trim().toLowerCase();
+        const existingItem = ingredients.find(i => i.name.toLowerCase() === normalizedNewName);
+
+        if (existingItem) {
+            const confirmMsg = `"${existingItem.name}" est déjà dans votre stock${existingItem.quantity !== '1' ? ` (Qté: ${existingItem.quantity})` : ''}.\n\nVoulez-vous fusionner et additionner les quantités ?`;
+            if (!window.confirm(confirmMsg)) {
+                return; // Annuler l'ajout
+            }
+        }
+
         const itemObj: Partial<Ingredient> = {
             name: newItem,
             quantity: newQuantity || '1',
@@ -123,7 +134,21 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
         setShowScannerModal(false);
         if (!items || items.length === 0) return;
 
-        const merged = mergeIntoStock(ingredients, items);
+        const existingNamesInStock = new Set(ingredients.map(i => i.name.toLowerCase()));
+        const duplicatedItems = items.filter(ci => ci.name && existingNamesInStock.has(ci.name.toLowerCase()));
+
+        let itemsToAdd = items;
+
+        if (duplicatedItems.length > 0) {
+            const names = duplicatedItems.map(d => d.name).join(', ');
+            const confirmMsg = `Attention, ces produits détectés sont déjà en stock : ${names}\n\nVoulez-vous fusionner et additionner leurs quantités avec le stock existant ?\n(Cliquez sur "Annuler" pour ignorer les doublons)`;
+            if (!window.confirm(confirmMsg)) {
+                itemsToAdd = itemsToAdd.filter(ci => ci.name && !existingNamesInStock.has(ci.name.toLowerCase()));
+                if (itemsToAdd.length === 0) return;
+            }
+        }
+
+        const merged = mergeIntoStock(ingredients, itemsToAdd);
         setIngredients(merged);
 
         setTimeout(() => {
