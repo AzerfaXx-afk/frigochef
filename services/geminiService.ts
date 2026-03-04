@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
-import { Ingredient, ShoppingItem, MissingIngredientResult, WeeklyPlan } from "../types";
+import { Ingredient, ShoppingItem, MissingIngredientResult, WeeklyPlan, UserProfile } from "../types";
 
 // 1. Initialisation
 const ai = new GoogleGenAI({
@@ -56,6 +56,72 @@ Chaque objet dans le tableau doit avoir cette structure exacte :
     } catch (e) {
         console.error("Erreur lors de l'analyse de l'image:", e);
         throw new Error("Impossible d'analyser l'image.");
+    }
+};
+
+export const analyzeReceipt = async (base64Image: string): Promise<Partial<Ingredient>[]> => {
+    try {
+        const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: [
+                {
+                    role: 'user',
+                    parts: [
+                        {
+                            text: `Tu es un expert culinaire et gestionnaire de stock. Analyse ce ticket de caisse et liste tous les ingrédients alimentaires ou produits visibles. 
+                        
+Règles strictes de sortie :
+1. Renvoie UNIQUEMENT un tableau JSON valide.
+2. N'ajoute AUCUN texte avant ou après le JSON.
+3. N'utilise pas de backticks \`\`\`json ou autres marqueurs de code.
+
+Chaque objet dans le tableau doit avoir cette structure exacte :
+{
+  "name": "Nom du produit en français (ex: Courgette, Lait 1L)",
+  "quantity": "Quantité estimée en chiffre ou texte (ex: 2, 500g, 1 bouteille)",
+  "category": "Une valeur parmi: produce, meat, frozen, drinks, sauce, pantry, other",
+  "expiryDate": "YYYY-MM-DD" ou null (utilise null pour les produits frais ou si la date n'est pas lisible/estimable)
+}` }
+                        , { inlineData: { data: base64Image, mimeType: 'image/jpeg' } }
+                    ]
+                }
+            ],
+            config: { temperature: 0.1 }
+        });
+
+        const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+        const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        return JSON.parse(cleanText);
+    } catch (e) {
+        console.error("Erreur lors de l'analyse du ticket:", e);
+        throw new Error("Impossible d'analyser l'image.");
+    }
+};
+
+export const fetchProductFromBarcode = async (barcode: string): Promise<Partial<Ingredient> | null> => {
+    try {
+        const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+        const data = await response.json();
+        if (data.status === 1 && data.product) {
+            const product = data.product;
+            let category: 'produce' | 'meat' | 'drinks' | 'sauce' | 'pantry' | 'frozen' | 'other' = 'other';
+            const catLower = (product.categories || '').toLowerCase();
+            if (catLower.includes('viande')) category = 'meat';
+            else if (catLower.includes('boissons')) category = 'drinks';
+            else if (catLower.includes('sauce')) category = 'sauce';
+            else if (catLower.includes('surgelé')) category = 'frozen';
+            else if (catLower.includes('plant')) category = 'produce';
+
+            return {
+                name: product.product_name_fr || product.product_name,
+                quantity: product.quantity || '1',
+                category: category
+            };
+        }
+        return null;
+    } catch (e) {
+        console.error("Erreur OpenFoodFacts:", e);
+        return null;
     }
 };
 
@@ -193,7 +259,17 @@ const saveRecipeTool: FunctionDeclaration = {
             description: { type: Type.STRING },
             ingredients: { type: Type.ARRAY, items: { type: Type.STRING } },
             steps: { type: Type.ARRAY, items: { type: Type.STRING } },
-            prepTime: { type: Type.STRING }
+            prepTime: { type: Type.STRING },
+            macros: {
+                type: Type.OBJECT,
+                description: "Valeurs nutritionnelles de la recette estimées",
+                properties: {
+                    calories: { type: Type.INTEGER },
+                    protein: { type: Type.INTEGER },
+                    carbs: { type: Type.INTEGER },
+                    fat: { type: Type.INTEGER }
+                }
+            }
         },
         required: ['title', 'ingredients', 'steps']
     }
@@ -236,22 +312,28 @@ export const chatWithChefStream = async function* (
     message: string,
     ingredients: Ingredient[],
     shoppingList: ShoppingItem[],
-    useSearch: boolean
-) {
+    userProfile: UserProfile
+): AsyncGenerator<any, void, unknown> {
     try {
         const inventoryText = ingredients.map(i => `${i.quantity} ${i.name}`).join(', ') || 'Vide';
         const shoppingText = shoppingList.map(i => i.name).join(', ') || 'Vide';
+
+        const dietsText = userProfile?.diets?.length ? userProfile.diets.join(', ') : 'Aucun';
+        const allergiesText = userProfile?.allergies?.length ? userProfile.allergies.join(', ') : 'Aucune';
 
         const systemInstruction = `Tu es FrigoChef AI, assistant culinaire expert interactif.
     CONTEXTE ACTUEL :
     - STOCK FRIGO : ${inventoryText}
     - LISTE COURSES : ${shoppingText}
+    - RÉGIMES ALIMENTAIRES DE L'UTILISATEUR : ${dietsText}
+    - ALLERGIES/INTOLÉRANCES DE L'UTILISATEUR : ${allergiesText}
     
     RÈGLES IMPORTANTES :
-    - Si on te demande de créer un "plan pour la semaine", du "Meal Prep" ou un "menu de la semaine", tu DOIS utiliser l'outil \`genererPlanSemaine\`. Remplis-le intelligemment en considérant les préférences (budget, allergies, etc.) mentionnées par l'utilisateur.
-    - Si on te demande une recette individuelle, invente ou propose une recette en utilisant au maximum le stock actuel.
-    - Tu as un contrôle TOTAL sur l'application. Utilise les outils (\`ajouterAuStock\`, \`retirerDuStock\`, \`ajouterAuPanier\`, \`retirerDuPanier\`, \`sauvegarderRecette\`) PÈS qu'on te donne un ordre correspondant. Ex: "enlève les pâtes de la liste" -> appele \`retirerDuPanier\`.
-    - Quand tu crées un plan de semaine, assure-toi d'inclure dans la \`shoppingList\` uniquement les articles qui ne sont pas déjà dans le STOCK FRIGO. Ton plan doit pouvoir subvenir au nombre de personnes demandé.
+    - Si l'utilisateur demande une recette ou un plan de semaine, tu DOIS ABSOLUMENT respecter ses régimes et allergies.
+    - Si tu fournis une recette ou proposes d'utiliser l'outil \`sauvegarderRecette\`, inclus TOUJOURS une estimation nutritionnelle des macros (calories, protéines, glucides, lipides).
+    - Si on te demande de créer un "plan pour la semaine", du "Meal Prep" ou un menu, tu DOIS utiliser l'outil \`genererPlanSemaine\`. Remplis-le de manière intelligente en considérant toutes les contraintes.
+    - Tu as un contrôle TOTAL sur l'application via les outils (\`ajouterAuStock\`, \`retirerDuStock\`, \`ajouterAuPanier\`, \`retirerDuPanier\`, \`sauvegarderRecette\`).
+    - Quand tu crées un plan de semaine, assure-toi d'inclure dans la \`shoppingList\` uniquement les articles qui ne sont pas déjà dans le STOCK FRIGO.
     - Sois expressif et concis, tu t'adresses à voix haute à l'utilisateur. Parle comme un chef passionné.`;
 
         // Préparation de l'historique
@@ -271,9 +353,6 @@ export const chatWithChefStream = async function* (
         contents.push({ role: 'user', parts: [{ text: message }] });
 
         const finalTools: any[] = [{ functionDeclarations: tools }];
-        if (useSearch) {
-            finalTools.push({ googleSearch: {} });
-        }
 
         const responseStream = await ai.models.generateContentStream({
             model: MODEL_NAME,
@@ -347,14 +426,18 @@ export const chatWithChefStream = async function* (
 };
 
 // --- STUBS ---
-export const generateRecipePlan = async (ingredients: Ingredient[], request: string) => {
+export const generateRecipePlan = async (ingredients: Ingredient[], request: string, userProfile: UserProfile) => {
     try {
+        const dietsText = userProfile?.diets?.length ? userProfile.diets.join(', ') : 'Aucun';
+        const allergiesText = userProfile?.allergies?.length ? userProfile.allergies.join(', ') : 'Aucune';
+
+        const promptText = "Plan repas pour: " + request + ". Stock: " + ingredients.map(i => i.name).join(', ') + ". Régimes: " + dietsText + ". Allergies: " + allergiesText + ". IMPORTANT: Fournis systématiquement une estimation des macros (calories, protéines, lipides, glucides) pour chaque recette.";
+
         const response = await ai.models.generateContent({
             model: MODEL_NAME,
-            contents: [{ role: 'user', parts: [{ text: `Plan repas pour: ${request}. Stock: ${ingredients.map(i => i.name).join(', ')}` }] }]
+            contents: [{ role: 'user', parts: [{ text: promptText }] }]
         });
 
-        // Correction ici aussi pour la lecture du résultat unique
         const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
         return text || "Impossible de générer le plan.";
     } catch (e) { return "Erreur lors de la génération."; }

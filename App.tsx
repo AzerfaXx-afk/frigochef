@@ -272,6 +272,7 @@ const App: React.FC = () => {
                 isActive={currentTab === AppTab.ASSISTANT}
                 messages={chatMessages}
                 setMessages={setChatMessages}
+                userProfile={userProfile}
               />
             )}
             {currentTab === AppTab.CARNET && (

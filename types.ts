@@ -6,6 +6,7 @@ export interface Ingredient {
   quantity: string;
   expiryDate: string | null; // ISO string YYYY-MM-DD
   category: 'produce' | 'meat' | 'drinks' | 'sauce' | 'pantry' | 'frozen' | 'other';
+  isNew?: boolean; // UI flag to highlight recently added items
 }
 
 export interface ShoppingItem {
@@ -28,6 +29,12 @@ export interface Recipe {
   ingredients: string[];
   steps: string[];
   prepTime?: string;
+  macros?: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
   createdAt: number;
   isFavorite?: boolean;
   isPinned?: boolean;
@@ -46,6 +53,8 @@ export interface ChatMessage {
 export interface UserProfile {
   name: string;
   avatar?: string; // base64 data url
+  diets?: string[];
+  allergies?: string[];
 }
 
 export enum AppTab {

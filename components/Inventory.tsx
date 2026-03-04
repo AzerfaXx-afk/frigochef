@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Ingredient } from '../types';
 import { Plus, Trash2, AlertTriangle, Apple, Beef, Wine, Soup, Search, Package, Clock, ChevronRight, ChevronLeft, Pencil, Check, X, Layers, Calendar, Camera, Loader2 } from 'lucide-react';
 import { scanIngredientsFromImage } from '../services/geminiService';
+import ScannerModal from './ScannerModal';
 
 interface Props {
     ingredients: Ingredient[];
@@ -26,6 +27,7 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
     const [expiryDate, setExpiryDate] = useState('');
     const [category, setCategory] = useState<Ingredient['category']>('produce');
     const [isScanning, setIsScanning] = useState(false);
+    const [showScannerModal, setShowScannerModal] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Sort State
@@ -62,46 +64,31 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
         setExpiryDate('');
     };
 
-    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
+    const handleItemsDetected = (items: Partial<Ingredient>[]) => {
+        setShowScannerModal(false);
+        if (!items || items.length === 0) return;
 
-        try {
-            setIsScanning(true);
-            const reader = new FileReader();
+        const newIngredients: Ingredient[] = items.map(item => ({
+            id: Date.now().toString() + Math.random().toString(),
+            name: item.name || 'Produit inconnu',
+            quantity: item.quantity || '1',
+            category: item.category as any || 'other',
+            expiryDate: item.expiryDate || null,
+            isNew: true
+        }));
 
-            reader.onloadend = async () => {
-                const base64Data = (reader.result as string).split(',')[1];
-                try {
-                    const scannedItems = await scanIngredientsFromImage(base64Data);
+        setIngredients(prev => [...prev, ...newIngredients]);
 
-                    if (scannedItems && scannedItems.length > 0) {
-                        const newIngredients: Ingredient[] = scannedItems.map(item => ({
-                            id: Date.now().toString() + Math.random().toString(),
-                            name: item.name || 'Produit inconnu',
-                            quantity: item.quantity || '1',
-                            category: item.category as any || 'other',
-                            expiryDate: item.expiryDate || null
-                        }));
-
-                        setIngredients(prev => [...prev, ...newIngredients]);
-                    }
-                } catch (apiError) {
-                    console.error("Erreur API Vision", apiError);
-                    alert("Impossible d'analyser l'image. Assurez-vous d'avoir une connexion internet.");
-                } finally {
-                    setIsScanning(false);
-                    if (fileInputRef.current) {
-                        fileInputRef.current.value = '';
-                    }
-                }
-            };
-
-            reader.readAsDataURL(file);
-        } catch (e) {
-            setIsScanning(false);
-            console.error("Erreur lecture fichier", e);
-        }
+        // Remove the isNew flag after 3 seconds for the highlight animation
+        setTimeout(() => {
+            setIngredients(currentItems =>
+                currentItems.map(i =>
+                    newIngredients.some(ni => ni.id === i.id)
+                        ? { ...i, isNew: false }
+                        : i
+                )
+            );
+        }, 3000);
     };
 
     const removeIngredient = (id: string) => {
@@ -239,7 +226,7 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
         return (
             <div
                 key={item.id}
-                className={`group flex items-center justify-between p-3 rounded-2xl border shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-all duration-300 hover:shadow-md mb-3 ${isExpired ? 'bg-red-50/50 dark:bg-red-900/20 border-red-100 dark:border-red-900' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700'
+                className={`group flex items-center justify-between p-3 rounded-2xl border shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-all duration-300 hover:shadow-md mb-3 ${item.isNew ? 'ring-2 ring-emerald-500/80 bg-emerald-50/50 dark:bg-emerald-900/30' : ''} ${isExpired ? 'bg-red-50/50 dark:bg-red-900/20 border-red-100 dark:border-red-900' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700'
                     }`}
             >
                 <div className="flex items-center gap-3 overflow-hidden flex-1">
@@ -358,24 +345,11 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
 
                     {/* Camera Scanner Button */}
                     <div className="relative shrink-0">
-                        <input
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            ref={fileInputRef}
-                            onChange={handleFileUpload}
-                            className="hidden"
-                            id="camera-input"
-                        />
                         <button
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isScanning}
-                            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-md group ${isScanning
-                                ? 'bg-slate-100 dark:bg-slate-800 text-emerald-500 border border-emerald-200 dark:border-emerald-800'
-                                : 'bg-gradient-to-br from-teal-400 to-emerald-500 text-white hover:shadow-lg hover:from-teal-500 hover:to-emerald-600 active:scale-95 border border-emerald-400/50'
-                                }`}
+                            onClick={() => setShowScannerModal(true)}
+                            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-md group bg-gradient-to-br from-teal-400 to-emerald-500 text-white hover:shadow-lg hover:from-teal-500 hover:to-emerald-600 active:scale-95 border border-emerald-400/50`}
                         >
-                            {isScanning ? <Loader2 size={20} className="animate-spin" /> : <Camera size={22} className="group-hover:scale-110 transition-transform" />}
+                            <Camera size={22} className="group-hover:scale-110 transition-transform" />
                         </button>
                     </div>
                 </div>
@@ -498,6 +472,12 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
              cursor: pointer;
           }
       `}</style>
+            {showScannerModal && (
+                <ScannerModal
+                    onClose={() => setShowScannerModal(false)}
+                    onItemsDetected={handleItemsDetected}
+                />
+            )}
         </div>
     );
 };

@@ -212,9 +212,17 @@ const Carnet: React.FC<Props> = ({ savedRecipes, setSavedRecipes, ingredients, s
                                 </div>
                             </div>
                             <p className="text-xs text-slate-500 line-clamp-2 italic">{recipe.description || recipe.steps[0]}</p>
-                            <div className="flex items-center gap-2 mt-2">
-                                <Clock size={12} className="text-emerald-500" />
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">{recipe.prepTime || '20 min'}</span>
+                            <div className="flex items-center justify-between mt-2">
+                                <div className="flex items-center gap-2">
+                                    <Clock size={12} className="text-emerald-500" />
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">{recipe.prepTime || '20 min'}</span>
+                                </div>
+                                {recipe.macros && (
+                                    <div className="flex gap-1.5">
+                                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-900/40 px-1.5 py-0.5 rounded">{recipe.macros.calories} kcal</span>
+                                        <span className="text-[9px] font-bold text-sky-700 bg-sky-100 dark:bg-sky-900/40 px-1.5 py-0.5 rounded">{recipe.macros.protein}g P</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))
@@ -234,6 +242,14 @@ const Carnet: React.FC<Props> = ({ savedRecipes, setSavedRecipes, ingredients, s
                     <div className="flex-1 overflow-y-auto p-6 space-y-6">
                         <div className="bg-emerald-50 dark:bg-emerald-950/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-900">
                             <p className="text-sm italic text-slate-700 dark:text-slate-300">{selectedRecipe.description}</p>
+                            {selectedRecipe.macros && (
+                                <div className="mt-4 flex flex-wrap gap-2 justify-between border-t border-emerald-200/50 dark:border-emerald-900/50 pt-3">
+                                    <div className="flex flex-col items-center"><span className="text-[9px] uppercase text-emerald-600 dark:text-emerald-500 font-bold mb-0.5">Calories</span><span className="font-bold text-sm text-slate-800 dark:text-white">{selectedRecipe.macros.calories}</span></div>
+                                    <div className="flex flex-col items-center"><span className="text-[9px] uppercase text-sky-600 dark:text-sky-500 font-bold mb-0.5">Protéines</span><span className="font-bold text-sm text-slate-800 dark:text-white">{selectedRecipe.macros.protein}g</span></div>
+                                    <div className="flex flex-col items-center"><span className="text-[9px] uppercase text-amber-600 dark:text-amber-500 font-bold mb-0.5">Glucides</span><span className="font-bold text-sm text-slate-800 dark:text-white">{selectedRecipe.macros.carbs}g</span></div>
+                                    <div className="flex flex-col items-center"><span className="text-[9px] uppercase text-rose-600 dark:text-rose-500 font-bold mb-0.5">Lipides</span><span className="font-bold text-sm text-slate-800 dark:text-white">{selectedRecipe.macros.fat}g</span></div>
+                                </div>
+                            )}
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-3">

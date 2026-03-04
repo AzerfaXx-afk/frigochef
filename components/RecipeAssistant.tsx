@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChatMessage, Ingredient, Recipe, ShoppingItem } from '../types';
+import { ChatMessage, Ingredient, Recipe, ShoppingItem, UserProfile } from '../types';
 import {
     chatWithChefStream,
     generateRecipePlan
@@ -15,6 +15,7 @@ interface Props {
     isActive: boolean;
     messages: ChatMessage[];
     setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
+    userProfile: UserProfile;
 }
 
 const FormattedText: React.FC<{ text: string }> = ({ text }) => {
@@ -81,7 +82,7 @@ const SUGGESTION_MODES = [
     }
 ];
 
-const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSavedRecipes, shoppingList, setShoppingList, isActive, messages, setMessages }) => {
+const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSavedRecipes, shoppingList, setShoppingList, isActive, messages, setMessages, userProfile }) => {
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
@@ -441,7 +442,7 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
 
             if (isComplex) {
                 setIsThinking(true);
-                const resultText = await generateRecipePlan(ingredients, userMsg.text);
+                const resultText = await generateRecipePlan(ingredients, userMsg.text, userProfile);
                 setIsThinking(false);
                 const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'model', text: resultText };
                 setMessages(prev => [...prev, aiMsg]);
@@ -460,7 +461,7 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
                 let groundingUrls: string[] = [];
 
                 // Remove the useSearch parameter as the feature has been removed
-                const stream = chatWithChefStream(history, userMsg.text, ingredients, shoppingList, false);
+                const stream = chatWithChefStream(history, userMsg.text, ingredients, shoppingList, userProfile);
 
                 for await (const chunk of stream) {
                     const textChunk = chunk.text;

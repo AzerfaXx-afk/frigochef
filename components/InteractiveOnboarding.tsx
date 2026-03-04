@@ -27,8 +27,8 @@ const tutorialSteps: TutorialStep[] = [
     {
         targetId: 'nav-inventory',
         tab: AppTab.INVENTORY,
-        title: "Ton Stock Intelligent",
-        description: "Ajoute ici les ingrédients de ton frigo. Je te préviendrai quand ils seront sur le point de périmer pour éviter le gaspi !",
+        title: "Ton Stock Intelligent & Caméra IA",
+        description: "Gère ton frigo ici. Nouveauté : Utilise l'appareil photo pour scanner un ticket de caisse ou un code-barres et ajouter tes produits instantanément en stock !",
         placement: 'top',
     },
     {

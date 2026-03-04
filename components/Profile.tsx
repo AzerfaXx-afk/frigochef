@@ -1,6 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { UserProfile, AppNotification } from '../types';
-import { User, Moon, Sun, Camera, ToggleLeft, ToggleRight, Smartphone, Share, X, MoreVertical, Download, HelpCircle, Flame, Bell, CheckCircle, Trash2, Check, ChevronRight } from 'lucide-react';
+import { User, Moon, Sun, Camera, ToggleLeft, ToggleRight, Smartphone, Share, X, MoreVertical, Download, HelpCircle, Flame, Bell, CheckCircle, Trash2, Check, ChevronRight, Leaf, ShieldAlert } from 'lucide-react';
+
+const PREDEFINED_DIETS = ['Végétarien', 'Végétalien (Vegan)', 'Keto', 'Sans Porc', 'Pescatarien'];
+const PREDEFINED_ALLERGIES = ['Arachides', 'Fruits à coque', 'Lait', 'Oeufs', 'Soja', 'Gluten', 'Sésame'];
 
 interface Props {
     userProfile: UserProfile;
@@ -26,6 +29,7 @@ const Profile: React.FC<Props> = ({
 }) => {
     const [isEditingName, setIsEditingName] = useState(false);
     const [newName, setNewName] = useState(userProfile.name);
+    const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const unreadCount = (notifications || []).filter(n => !n.read).length;
@@ -46,6 +50,22 @@ const Profile: React.FC<Props> = ({
             reader.onloadend = () => { setUserProfile(prev => ({ ...prev, avatar: reader.result as string })); };
             reader.readAsDataURL(file);
         }
+    };
+
+    const toggleDiet = (diet: string) => {
+        const currentDiets = userProfile.diets || [];
+        const newDiets = currentDiets.includes(diet)
+            ? currentDiets.filter(d => d !== diet)
+            : [...currentDiets, diet];
+        setUserProfile({ ...userProfile, diets: newDiets });
+    };
+
+    const toggleAllergy = (allergy: string) => {
+        const currentAllergies = userProfile.allergies || [];
+        const newAllergies = currentAllergies.includes(allergy)
+            ? currentAllergies.filter(a => a !== allergy)
+            : [...currentAllergies, allergy];
+        setUserProfile({ ...userProfile, allergies: newAllergies });
     };
 
     // Styles Streak Dynamique
@@ -178,6 +198,81 @@ const Profile: React.FC<Props> = ({
                                     ))}
                                 </div>
                             )}
+                        </div>
+                    )}
+                </div>
+
+                {/* ZONE DIÉTÉTIQUE ET ALLERGIES EN COLLAPSIBLE */}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden shadow-sm mt-4 transition-all">
+
+                    <div
+                        className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
+                        onClick={() => setIsPreferencesOpen(!isPreferencesOpen)}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400">
+                                <Leaf size={18} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Préférences Alimentaires</p>
+                                <p className="text-[10px] text-slate-400 truncate">Régimes & Allergies (Keto, Sans Gluten...)</p>
+                            </div>
+                        </div>
+                        <div className={`transition-transform duration-300 ${isPreferencesOpen ? 'rotate-90 text-emerald-500' : 'text-slate-300'}`}>
+                            <ChevronRight size={18} />
+                        </div>
+                    </div>
+
+                    {isPreferencesOpen && (
+                        <div className="divide-y divide-slate-100 dark:divide-slate-700/50 border-t border-slate-100 dark:border-slate-700 animate-in fade-in duration-200 bg-slate-50/50 dark:bg-slate-900/30">
+                            <div className="p-4">
+                                <div className="flex items-center gap-2 mb-3 text-emerald-600 dark:text-emerald-400">
+                                    <Leaf size={18} />
+                                    <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100">Régimes Alimentaires</h3>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {PREDEFINED_DIETS.map(diet => {
+                                        const isSelected = (userProfile.diets || []).includes(diet);
+                                        return (
+                                            <button
+                                                key={diet}
+                                                onClick={() => toggleDiet(diet)}
+                                                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${isSelected
+                                                    ? 'bg-emerald-100 border-emerald-200 text-emerald-700 dark:bg-emerald-900/40 dark:border-emerald-800 dark:text-emerald-300'
+                                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 dark:bg-slate-800/80 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-700'
+                                                    }`}
+                                            >
+                                                {diet}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div className="p-4">
+                                <div className="flex items-center gap-2 mb-3 text-rose-500 dark:text-rose-400">
+                                    <ShieldAlert size={18} />
+                                    <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100">Allergies & Intolérances</h3>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {PREDEFINED_ALLERGIES.map(allergy => {
+                                        const isSelected = (userProfile.allergies || []).includes(allergy);
+                                        return (
+                                            <button
+                                                key={allergy}
+                                                onClick={() => toggleAllergy(allergy)}
+                                                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${isSelected
+                                                    ? 'bg-rose-100 border-rose-200 text-rose-700 dark:bg-rose-900/40 dark:border-rose-800 dark:text-rose-300'
+                                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 dark:bg-slate-800/80 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-700'
+                                                    }`}
+                                            >
+                                                {allergy}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <p className="mt-3 text-[10px] text-slate-400 italic">Ces préférences seront prises en compte par Chef Gemini lors de la génération de recettes.</p>
+                            </div>
                         </div>
                     )}
                 </div>
