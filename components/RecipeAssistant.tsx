@@ -295,13 +295,20 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
 
         if (name === 'ajouterAuPanier') {
             const itemsToAdd = (args.items || []) as string[];
-            const newShoppingItems: ShoppingItem[] = itemsToAdd.map(name => ({
+            const existingNames = new Set(shoppingList.map(i => i.name.trim().toLowerCase()));
+            const newNames = itemsToAdd.filter(name => !existingNames.has(name.trim().toLowerCase()));
+            const duplicates = itemsToAdd.filter(name => existingNames.has(name.trim().toLowerCase()));
+
+            const newShoppingItems: ShoppingItem[] = newNames.map(name => ({
                 id: Date.now().toString() + Math.random(),
                 name: name,
                 checked: false
             }));
-            setShoppingList(prev => [...prev, ...newShoppingItems]);
-            return { added: itemsToAdd };
+
+            if (newShoppingItems.length > 0) {
+                setShoppingList(prev => [...prev, ...newShoppingItems]);
+            }
+            return { added: newNames, duplicates };
         }
 
         if (name === 'retirerDuPanier') {
@@ -333,20 +340,28 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
         if (name === 'genererPlanSemaine') {
             const planMeals = args.meals || [];
             const planShoppingList = args.shoppingList || [];
+            let addedCount = 0;
 
             // Add missing items to shopping list
             if (planShoppingList.length > 0) {
-                const newShoppingItems: ShoppingItem[] = planShoppingList.map((itemName: string) => ({
+                const existingNames = new Set(shoppingList.map(i => i.name.trim().toLowerCase()));
+                const newNames = planShoppingList.filter((name: string) => !existingNames.has(name.trim().toLowerCase()));
+
+                const newShoppingItems: ShoppingItem[] = newNames.map((itemName: string) => ({
                     id: Date.now().toString() + Math.random(),
                     name: itemName,
                     checked: false
                 }));
-                setShoppingList(prev => [...prev, ...newShoppingItems]);
+                if (newShoppingItems.length > 0) {
+                    setShoppingList(prev => [...prev, ...newShoppingItems]);
+                    addedCount = newShoppingItems.length;
+                }
             }
 
             return {
                 plan: planMeals,
-                shoppingListAdded: planShoppingList
+                shoppingListAdded: planShoppingList,
+                addedCount: addedCount
             };
         }
 
@@ -538,9 +553,15 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
                                 }
                                 setModeIndex(1); // Force Stock Mode
                             } else if (call.name === 'ajouterAuPanier') {
-                                const items = result.added.join(', ');
-                                toolOutput += `\n\n🛒 Ajouté liste : **${items}**.`;
-                                queueAudioChunk("J'ai ajouté ça à votre liste de courses.");
+                                let outputText = "";
+                                if (result.added && result.added.length > 0) {
+                                    outputText += `\n\n🛒 Ajouté liste : **${result.added.join(', ')}**.`;
+                                }
+                                if (result.duplicates && result.duplicates.length > 0) {
+                                    outputText += `\n\n⚠️ Déjà dans la liste : **${result.duplicates.join(', ')}**.`;
+                                }
+                                toolOutput += outputText || "\n\nPas d'articles ajoutés.";
+                                queueAudioChunk("C'est noté pour la liste de courses.");
                                 setModeIndex(0); // Force Shopping List Mode
                             } else if (call.name === 'retirerDuPanier') {
                                 const items = result.removed.join(', ');
@@ -556,7 +577,7 @@ const RecipeAssistant: React.FC<Props> = ({ ingredients, setIngredients, setSave
                                 result.plan.forEach((meal: any) => {
                                     toolOutput += `- **${meal.day} (${meal.type})** : ${meal.recipeName}\n`;
                                 });
-                                toolOutput += `\n🛒 **${result.shoppingListAdded.length} articles ajoutés** à votre liste de courses.`;
+                                toolOutput += `\n🛒 **${result.addedCount} articles ajoutés** à votre liste de courses.`;
                                 queueAudioChunk("J'ai généré votre plan de la semaine et ajouté ce qu'il vous manquait à votre liste de courses.");
                                 setModeIndex(0); // Switch to Shopping view
                             }

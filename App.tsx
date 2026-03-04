@@ -274,7 +274,15 @@ const App: React.FC = () => {
                 setMessages={setChatMessages}
               />
             )}
-            {currentTab === AppTab.CARNET && <Carnet savedRecipes={savedRecipes} setSavedRecipes={setSavedRecipes} />}
+            {currentTab === AppTab.CARNET && (
+              <Carnet
+                savedRecipes={savedRecipes}
+                setSavedRecipes={setSavedRecipes}
+                ingredients={ingredients}
+                shoppingList={shoppingList}
+                setShoppingList={setShoppingList}
+              />
+            )}
             {currentTab === AppTab.PROFILE && (
               <Profile
                 userProfile={userProfile}

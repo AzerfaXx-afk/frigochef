@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Recipe } from '../types';
-import { BookOpen, Clock, ChevronRight, Search, ChefHat, Volume2, StopCircle, Heart, Pin, Loader2, Trash2, AlignLeft, RefreshCcw, XCircle, ArrowLeft } from 'lucide-react';
+import { Recipe, Ingredient, ShoppingItem } from '../types';
+import { BookOpen, Clock, ChevronRight, Search, ChefHat, Volume2, StopCircle, Heart, Pin, Loader2, Trash2, AlignLeft, RefreshCcw, XCircle, ArrowLeft, Plus } from 'lucide-react';
 // Removing obsolete audio import
 
 
 interface Props {
     savedRecipes: Recipe[];
     setSavedRecipes: React.Dispatch<React.SetStateAction<Recipe[]>>;
+    ingredients: Ingredient[];
+    shoppingList: ShoppingItem[];
+    setShoppingList: React.Dispatch<React.SetStateAction<ShoppingItem[]>>;
 }
 
 const getIngredientEmoji = (name: string): string => {
@@ -20,11 +23,43 @@ const getIngredientEmoji = (name: string): string => {
     return '🥘';
 };
 
-const Carnet: React.FC<Props> = ({ savedRecipes, setSavedRecipes }) => {
+const Carnet: React.FC<Props> = ({ savedRecipes, setSavedRecipes, ingredients, shoppingList, setShoppingList }) => {
     const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [showTrash, setShowTrash] = useState(false);
     const [loadingAudio, setLoadingAudio] = useState(false);
+    const [addedFeedback, setAddedFeedback] = useState<string | null>(null);
+
+    const handleAddMissingIngredients = () => {
+        if (!selectedRecipe) return;
+
+        const missingIngredients = selectedRecipe.ingredients.filter(recipeIng => {
+            const lowerRecipeIng = recipeIng.toLowerCase();
+            const inInventory = ingredients.some(i => lowerRecipeIng.includes(i.name.trim().toLowerCase()));
+            const inShoppingList = shoppingList.some(i => lowerRecipeIng.includes(i.name.trim().toLowerCase()));
+            return !inInventory && !inShoppingList;
+        });
+
+        if (missingIngredients.length > 0) {
+            const newShoppingItems: ShoppingItem[] = missingIngredients.map(ing => ({
+                id: Date.now().toString() + Math.random(),
+                name: ing,
+                checked: false
+            }));
+
+            setShoppingList(prev => [...prev, ...newShoppingItems]);
+            setAddedFeedback(`${missingIngredients.length} ajoutés !`);
+        } else {
+            setAddedFeedback("Déjà complet !");
+        }
+
+        setTimeout(() => setAddedFeedback(null), 3000);
+    };
+
+    const closeRecipe = () => {
+        setSelectedRecipe(null);
+        setAddedFeedback(null);
+    };
 
     const filteredRecipes = savedRecipes.filter(r =>
         showTrash ? r.isDeleted : !r.isDeleted
@@ -190,7 +225,7 @@ const Carnet: React.FC<Props> = ({ savedRecipes, setSavedRecipes }) => {
             {selectedRecipe && createPortal(
                 <div className="fixed inset-0 z-[100] bg-white dark:bg-slate-900 flex flex-col animate-in slide-in-from-bottom-full duration-300">
                     <div className="pt-10 pb-4 px-6 border-b border-slate-100 flex items-center justify-between bg-white dark:bg-slate-900">
-                        <button onClick={() => setSelectedRecipe(null)} className="p-2 rounded-full bg-slate-100"><ChevronRight className="rotate-180" /></button>
+                        <button onClick={closeRecipe} className="p-2 rounded-full bg-slate-100"><ChevronRight className="rotate-180" /></button>
                         <h2 className="font-bold text-lg text-slate-900 dark:text-white truncate mx-4">{selectedRecipe.title}</h2>
                         <button onClick={(e) => handlePlay(e, selectedRecipe.steps.join(' '))} className="p-2 bg-emerald-100 text-emerald-600 rounded-full">
                             {loadingAudio ? <Loader2 className="animate-spin" /> : <Volume2 />}
@@ -201,7 +236,16 @@ const Carnet: React.FC<Props> = ({ savedRecipes, setSavedRecipes }) => {
                             <p className="text-sm italic text-slate-700 dark:text-slate-300">{selectedRecipe.description}</p>
                         </div>
                         <div>
-                            <h3 className="font-bold mb-3 dark:text-white">Ingrédients</h3>
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="font-bold dark:text-white">Ingrédients</h3>
+                                <button
+                                    onClick={handleAddMissingIngredients}
+                                    className="text-xs font-bold px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-800 transition-colors flex items-center gap-1.5 active:scale-95"
+                                >
+                                    <Plus size={14} />
+                                    {addedFeedback ? addedFeedback : "Ajouter les manquants"}
+                                </button>
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 {selectedRecipe.ingredients.map((ing, i) => (
                                     <span key={i} className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-medium dark:text-white">{getIngredientEmoji(ing)} {ing}</span>
