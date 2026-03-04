@@ -49,16 +49,71 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
 
     const scrollRef = useRef<HTMLDivElement>(null);
 
+    const mergeIntoStock = (prevStock: Ingredient[], newDetectedItems: Partial<Ingredient>[]) => {
+        const finalStock = [...prevStock];
+        const newlyAdded: Ingredient[] = [];
+
+        newDetectedItems.forEach(newItem => {
+            if (!newItem.name) return;
+            const normalizedNewName = newItem.name.trim();
+            const existingIndex = finalStock.findIndex(
+                (i) => i.name.toLowerCase() === normalizedNewName.toLowerCase()
+            );
+
+            if (existingIndex >= 0) {
+                // Fusion avec un élément existant
+                const existingItem = finalStock[existingIndex];
+
+                let mergedQty = existingItem.quantity;
+                const exNum = parseFloat(existingItem.quantity);
+                const newNum = parseFloat(newItem.quantity || '1');
+
+                if (!isNaN(exNum) && !isNaN(newNum) && existingItem.quantity === exNum.toString() && (newItem.quantity || '1') === newNum.toString()) {
+                    mergedQty = (exNum + newNum).toString();
+                } else if (existingItem.quantity !== (newItem.quantity || '1')) {
+                    mergedQty = `${existingItem.quantity} + ${newItem.quantity || '1'}`;
+                }
+
+                finalStock[existingIndex] = {
+                    ...existingItem,
+                    quantity: mergedQty,
+                    expiryDate: existingItem.expiryDate || newItem.expiryDate || null,
+                    isNew: true
+                };
+            } else {
+                // Nouvel élément
+                newlyAdded.push({
+                    id: Date.now().toString() + Math.random().toString(),
+                    name: normalizedNewName,
+                    quantity: newItem.quantity || '1',
+                    category: newItem.category as any || 'other',
+                    expiryDate: newItem.expiryDate || null,
+                    isNew: true
+                });
+            }
+        });
+
+        return [...finalStock, ...newlyAdded];
+    };
+
     const addIngredient = () => {
         if (!newItem.trim()) return;
-        const item: Ingredient = {
-            id: Date.now().toString(),
+        const itemObj: Partial<Ingredient> = {
             name: newItem,
             quantity: newQuantity || '1',
             expiryDate: expiryDate || null,
             category: category,
         };
-        setIngredients([...ingredients, item]);
+
+        const merged = mergeIntoStock(ingredients, [itemObj]);
+        setIngredients(merged);
+
+        setTimeout(() => {
+            setIngredients(currentItems =>
+                currentItems.map(i => ({ ...i, isNew: false }))
+            );
+        }, 1500);
+
         setNewItem('');
         setNewQuantity('');
         setExpiryDate('');
@@ -68,25 +123,12 @@ const Inventory: React.FC<Props> = ({ ingredients, setIngredients }) => {
         setShowScannerModal(false);
         if (!items || items.length === 0) return;
 
-        const newIngredients: Ingredient[] = items.map(item => ({
-            id: Date.now().toString() + Math.random().toString(),
-            name: item.name || 'Produit inconnu',
-            quantity: item.quantity || '1',
-            category: item.category as any || 'other',
-            expiryDate: item.expiryDate || null,
-            isNew: true
-        }));
+        const merged = mergeIntoStock(ingredients, items);
+        setIngredients(merged);
 
-        setIngredients(prev => [...prev, ...newIngredients]);
-
-        // Remove the isNew flag after 3 seconds for the highlight animation
         setTimeout(() => {
             setIngredients(currentItems =>
-                currentItems.map(i =>
-                    newIngredients.some(ni => ni.id === i.id)
-                        ? { ...i, isNew: false }
-                        : i
-                )
+                currentItems.map(i => ({ ...i, isNew: false }))
             );
         }, 3000);
     };

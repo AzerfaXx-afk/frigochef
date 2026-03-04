@@ -33,7 +33,7 @@ Chaque objet dans le tableau doit avoir cette structure exacte :
 {
   "name": "Nom du produit précis en français (ex: Courgette, Lait 1L, Yaourt Nature)",
   "quantity": "Quantité estimée en chiffre ou texte (ex: 1, 2, 500g, 1L, 1 paquet)",
-  "category": "Une valeur stricte parmi: produce, meat, frozen, drinks, sauce, pantry, other",
+  "category": "Une valeur stricte parmi: produce (Fruis/Légumes bruts), meat (Viande/Poisson), frozen (Surgelés), drinks (Boissons), sauce (Sauces/Condiments), pantry (Épicerie sèche: pâtes, conserves, gâteaux), other (Divers)",
   "expiryDate": "La date de péremption exacte lue sur le produit, au format YYYY-MM-DD. Si tu ne vois aucune date lisible ou qu'elle n'est pas applicable (ex: légume frais sans emballage), renvoie la valeur null (sans guillemets)."
 }` },
                         { inlineData: { data: base64Image, mimeType: 'image/jpeg' } }
@@ -108,11 +108,12 @@ export const fetchProductFromBarcode = async (barcode: string): Promise<Partial<
             const product = data.product;
             let category: 'produce' | 'meat' | 'drinks' | 'sauce' | 'pantry' | 'frozen' | 'other' = 'other';
             const catLower = (product.categories || '').toLowerCase();
-            if (catLower.includes('viande')) category = 'meat';
-            else if (catLower.includes('boissons')) category = 'drinks';
-            else if (catLower.includes('sauce')) category = 'sauce';
-            else if (catLower.includes('surgelé')) category = 'frozen';
-            else if (catLower.includes('plant')) category = 'produce';
+            if (catLower.includes('viande') || catLower.includes('poisson') || catLower.includes('volaille')) category = 'meat';
+            else if (catLower.includes('boisson') || catLower.includes('eau') || catLower.includes('jus')) category = 'drinks';
+            else if (catLower.includes('sauce') || catLower.includes('condiment') || catLower.includes('moutarde')) category = 'sauce';
+            else if (catLower.includes('surgelé') || catLower.includes('glace')) category = 'frozen';
+            else if (catLower.includes('fruit') || catLower.includes('légume') || catLower.includes('plant') || catLower.includes('salade')) category = 'produce';
+            else if (catLower.includes('épicerie') || catLower.includes('biscuit') || catLower.includes('chocolat') || catLower.includes('céréale') || catLower.includes('fromage') || catLower.includes('laitier')) category = 'pantry';
 
             return {
                 name: product.product_name_fr || product.product_name,
