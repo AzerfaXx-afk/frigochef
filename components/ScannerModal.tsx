@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 import { fetchProductFromBarcode, scanIngredientsFromImage } from '../services/geminiService';
 import { Ingredient } from '../types';
-import { X, Camera, Barcode, Loader2, Image as ImageIcon, CheckCircle } from 'lucide-react';
+import { X, Camera, Barcode, Loader2, Image as ImageIcon } from 'lucide-react';
 
 interface Props {
     onClose: () => void;
@@ -15,43 +15,64 @@ const ScannerModal: React.FC<Props> = ({ onClose, onItemsDetected }) => {
     const [loadingText, setLoadingText] = useState('');
     const photoInputRef = useRef<HTMLInputElement>(null);
     const galleryInputRef = useRef<HTMLInputElement>(null);
+    const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
 
     // Pour le scanner de code-barre
     useEffect(() => {
         if (mode === 'barcode') {
-            const scanner = new Html5QrcodeScanner(
-                "reader",
-                { fps: 10, qrbox: { width: 250, height: 150 } },
-                false
-            );
-
-            scanner.render(
-                async (decodedText) => {
-                    scanner.pause(true); // Pause scanning once we find something
-                    setIsLoading(true);
-                    setLoadingText('Recherche du produit...');
-                    try {
-                        const product = await fetchProductFromBarcode(decodedText);
-                        if (product) {
-                            onItemsDetected([product]);
-                        } else {
-                            alert("Produit introuvable !");
-                            scanner.resume();
+            const startScanner = async () => {
+                try {
+                    html5QrCodeRef.current = new Html5Qrcode("reader");
+                    await html5QrCodeRef.current.start(
+                        { facingMode: "environment" },
+                        { fps: 10, qrbox: { width: 250, height: 150 } },
+                        async (decodedText) => {
+                            if (html5QrCodeRef.current?.isScanning) {
+                                html5QrCodeRef.current.pause(); // Pause scanning once we find something
+                            }
+                            setIsLoading(true);
+                            setLoadingText('Recherche du produit...');
+                            try {
+                                const product = await fetchProductFromBarcode(decodedText);
+                                if (product) {
+                                    onItemsDetected([product]);
+                                } else {
+                                    alert("Produit introuvable !");
+                                    if (html5QrCodeRef.current?.isScanning) {
+                                        html5QrCodeRef.current.resume();
+                                    }
+                                }
+                            } catch (e) {
+                                console.error(e);
+                                if (html5QrCodeRef.current?.isScanning) {
+                                    html5QrCodeRef.current.resume();
+                                }
+                            } finally {
+                                setIsLoading(false);
+                            }
+                        },
+                        (error) => {
+                            // ignore frequent scan errors
                         }
-                    } catch (e) {
-                        console.error(e);
-                        scanner.resume();
-                    } finally {
-                        setIsLoading(false);
-                    }
-                },
-                (error) => {
-                    // just ignore frequent scan errs
+                    );
+                } catch (err) {
+                    console.error("Erreur de démarrage caméra", err);
+                    alert("Impossible d'accéder à la caméra pour le code-barre.");
+                    setMode('selection');
                 }
-            );
+            };
+
+            // Petit délai pour s'assurer que le div #reader est rendu
+            setTimeout(() => {
+                startScanner();
+            }, 100);
 
             return () => {
-                scanner.clear().catch(console.error);
+                if (html5QrCodeRef.current) {
+                    html5QrCodeRef.current.stop().then(() => {
+                        html5QrCodeRef.current?.clear();
+                    }).catch(console.error);
+                }
             };
         }
     }, [mode, onItemsDetected]);
@@ -59,6 +80,7 @@ const ScannerModal: React.FC<Props> = ({ onClose, onItemsDetected }) => {
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            setMode('vision');
             setIsLoading(true);
             setLoadingText('Chef Gemini analyse la photo...');
             const reader = new FileReader();
@@ -66,19 +88,26 @@ const ScannerModal: React.FC<Props> = ({ onClose, onItemsDetected }) => {
                 try {
                     const base64Image = (reader.result as string).split(',')[1];
                     const items = await scanIngredientsFromImage(base64Image);
-                    if (items.length > 0) {
+                    if (items && items.length > 0) {
                         onItemsDetected(items);
                     } else {
                         alert("Aucun ingrédient détecté sur l'image.");
+                        setMode('selection');
                     }
                 } catch (error) {
                     console.error(error);
                     alert("Erreur lors de l'analyse IA.");
+                    setMode('selection');
                 } finally {
                     setIsLoading(false);
+                    // Reset inputs
+                    if (photoInputRef.current) photoInputRef.current.value = "";
+                    if (galleryInputRef.current) galleryInputRef.current.value = "";
                 }
             };
             reader.readAsDataURL(file);
+        } else {
+            setMode('selection');
         }
     };
 
@@ -96,6 +125,23 @@ const ScannerModal: React.FC<Props> = ({ onClose, onItemsDetected }) => {
 
                 {/* CONTENT */}
                 <div className="p-6">
+                    {/* ALWAYS RENDER INPUTS (HIDDEN) TO PREVENT UNMOUNTING BUG */}
+                    <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        ref={photoInputRef}
+                        className="hidden"
+                        onChange={handleImageUpload}
+                    />
+                    <input
+                        type="file"
+                        accept="image/*"
+                        ref={galleryInputRef}
+                        className="hidden"
+                        onChange={handleImageUpload}
+                    />
+
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center py-10 gap-4">
                             <Loader2 size={48} className="text-emerald-500 animate-spin" />
@@ -112,13 +158,12 @@ const ScannerModal: React.FC<Props> = ({ onClose, onItemsDetected }) => {
                                 </div>
                                 <div>
                                     <h4 className="font-bold text-slate-800 dark:text-white">Scanner Code-barre</h4>
-                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">Scannez un emballage pour l'ajouter avec OpenFoodFacts en 1 seconde.</p>
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">Ouvre votre caméra pour un scan instantané.</p>
                                 </div>
                             </button>
 
                             <button
                                 onClick={() => {
-                                    setMode('vision');
                                     photoInputRef.current?.click();
                                 }}
                                 className="flex items-center gap-4 p-4 rounded-2xl border-2 border-indigo-100 dark:border-indigo-900/50 hover:border-indigo-500 dark:hover:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/10 transition-all text-left"
@@ -127,14 +172,13 @@ const ScannerModal: React.FC<Props> = ({ onClose, onItemsDetected }) => {
                                     <Camera size={24} className="text-indigo-600 dark:text-indigo-300" />
                                 </div>
                                 <div>
-                                    <h4 className="font-bold text-slate-800 dark:text-white">Prendre une photo complète</h4>
-                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">Prenez en photo un produit (DLC), votre frigo ou un ticket. L'IA extrait tout.</p>
+                                    <h4 className="font-bold text-slate-800 dark:text-white">Prendre une photo</h4>
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">Prenez en photo un emballage, un ticket ou le frigo complet.</p>
                                 </div>
                             </button>
 
                             <button
                                 onClick={() => {
-                                    setMode('vision');
                                     galleryInputRef.current?.click();
                                 }}
                                 className="flex items-center gap-4 p-4 rounded-2xl border-2 border-fuchsia-100 dark:border-fuchsia-900/50 hover:border-fuchsia-500 dark:hover:border-fuchsia-500 bg-fuchsia-50/50 dark:bg-fuchsia-900/10 transition-all text-left"
@@ -144,25 +188,10 @@ const ScannerModal: React.FC<Props> = ({ onClose, onItemsDetected }) => {
                                 </div>
                                 <div>
                                     <h4 className="font-bold text-slate-800 dark:text-white">Importer depuis la galerie</h4>
-                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">Sélectionnez une photo déjà existante sur votre appareil.</p>
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">Sélectionnez une photo de votre appareil.</p>
                                 </div>
                             </button>
 
-                            <input
-                                type="file"
-                                accept="image/*"
-                                capture="environment"
-                                ref={photoInputRef}
-                                className="hidden"
-                                onChange={handleImageUpload}
-                            />
-                            <input
-                                type="file"
-                                accept="image/*"
-                                ref={galleryInputRef}
-                                className="hidden"
-                                onChange={handleImageUpload}
-                            />
                         </div>
                     ) : mode === 'barcode' ? (
                         <div className="flex flex-col gap-4">
@@ -176,12 +205,12 @@ const ScannerModal: React.FC<Props> = ({ onClose, onItemsDetected }) => {
                         </div>
                     ) : (
                         <div className="text-center">
-                            <p className="text-sm text-slate-500">Ouverture de la galerie...</p>
+                            <p className="text-sm text-slate-500 flex items-center gap-2 justify-center"><Loader2 className="animate-spin" size={16} /> Envoi de l'image...</p>
                             <button
                                 onClick={() => setMode('selection')}
                                 className="text-xs font-bold text-emerald-500 mt-4"
                             >
-                                Retour
+                                Annuler
                             </button>
                         </div>
                     )}
