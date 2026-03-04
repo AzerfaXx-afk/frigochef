@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
-import { fetchProductFromBarcode, analyzeReceipt } from '../services/geminiService';
+import { fetchProductFromBarcode, scanIngredientsFromImage } from '../services/geminiService';
 import { Ingredient } from '../types';
 import { X, Camera, Barcode, Loader2, Image as ImageIcon, CheckCircle } from 'lucide-react';
 
@@ -13,7 +13,8 @@ const ScannerModal: React.FC<Props> = ({ onClose, onItemsDetected }) => {
     const [mode, setMode] = useState<'selection' | 'barcode' | 'vision'>('selection');
     const [isLoading, setIsLoading] = useState(false);
     const [loadingText, setLoadingText] = useState('');
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const photoInputRef = useRef<HTMLInputElement>(null);
+    const galleryInputRef = useRef<HTMLInputElement>(null);
 
     // Pour le scanner de code-barre
     useEffect(() => {
@@ -64,7 +65,7 @@ const ScannerModal: React.FC<Props> = ({ onClose, onItemsDetected }) => {
             reader.onloadend = async () => {
                 try {
                     const base64Image = (reader.result as string).split(',')[1];
-                    const items = await analyzeReceipt(base64Image);
+                    const items = await scanIngredientsFromImage(base64Image);
                     if (items.length > 0) {
                         onItemsDetected(items);
                     } else {
@@ -118,7 +119,7 @@ const ScannerModal: React.FC<Props> = ({ onClose, onItemsDetected }) => {
                             <button
                                 onClick={() => {
                                     setMode('vision');
-                                    fileInputRef.current?.click();
+                                    photoInputRef.current?.click();
                                 }}
                                 className="flex items-center gap-4 p-4 rounded-2xl border-2 border-indigo-100 dark:border-indigo-900/50 hover:border-indigo-500 dark:hover:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/10 transition-all text-left"
                             >
@@ -126,8 +127,24 @@ const ScannerModal: React.FC<Props> = ({ onClose, onItemsDetected }) => {
                                     <Camera size={24} className="text-indigo-600 dark:text-indigo-300" />
                                 </div>
                                 <div>
-                                    <h4 className="font-bold text-slate-800 dark:text-white">Vision IA (Frigo / Ticket)</h4>
-                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">Prenez en photo votre frigo ou votre ticket de caisse. Gemini extrait tout.</p>
+                                    <h4 className="font-bold text-slate-800 dark:text-white">Prendre une photo complète</h4>
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">Prenez en photo un produit (DLC), votre frigo ou un ticket. L'IA extrait tout.</p>
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    setMode('vision');
+                                    galleryInputRef.current?.click();
+                                }}
+                                className="flex items-center gap-4 p-4 rounded-2xl border-2 border-fuchsia-100 dark:border-fuchsia-900/50 hover:border-fuchsia-500 dark:hover:border-fuchsia-500 bg-fuchsia-50/50 dark:bg-fuchsia-900/10 transition-all text-left"
+                            >
+                                <div className="w-12 h-12 bg-fuchsia-100 dark:bg-fuchsia-800 rounded-full flex items-center justify-center shrink-0">
+                                    <ImageIcon size={24} className="text-fuchsia-600 dark:text-fuchsia-300" />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-slate-800 dark:text-white">Importer depuis la galerie</h4>
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">Sélectionnez une photo déjà existante sur votre appareil.</p>
                                 </div>
                             </button>
 
@@ -135,7 +152,14 @@ const ScannerModal: React.FC<Props> = ({ onClose, onItemsDetected }) => {
                                 type="file"
                                 accept="image/*"
                                 capture="environment"
-                                ref={fileInputRef}
+                                ref={photoInputRef}
+                                className="hidden"
+                                onChange={handleImageUpload}
+                            />
+                            <input
+                                type="file"
+                                accept="image/*"
+                                ref={galleryInputRef}
                                 className="hidden"
                                 onChange={handleImageUpload}
                             />

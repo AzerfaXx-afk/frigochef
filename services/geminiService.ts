@@ -20,8 +20,10 @@ export const scanIngredientsFromImage = async (base64Image: string): Promise<Par
                     role: 'user',
                     parts: [
                         {
-                            text: `Tu es un expert culinaire et gestionnaire de stock. Analyse cette image et liste tous les ingrédients alimentaires ou produits visibles. 
+                            text: `Tu es un expert culinaire et un gestionnaire de stock ultra-précis. Analyse cette image qui peut être : 1) un produit seul, 2) un ticket de caisse, ou 3) l'intérieur d'un frigo/placard.
                         
+Ta mission est d'identifier les produits alimentaires et de lire TOUTE information sur la date de péremption (DLC, DLUO, "À consommer de préférence avant le", etc.).
+
 Règles strictes de sortie :
 1. Renvoie UNIQUEMENT un tableau JSON valide.
 2. N'ajoute AUCUN texte avant ou après le JSON.
@@ -29,10 +31,10 @@ Règles strictes de sortie :
 
 Chaque objet dans le tableau doit avoir cette structure exacte :
 {
-  "name": "Nom du produit en français (ex: Courgette, Lait 1L)",
-  "quantity": "Quantité estimée en chiffre ou texte (ex: 2, 500g, 1 bouteille)",
-  "category": "Une valeur parmi: produce, meat, frozen, drinks, sauce, pantry, other",
-  "expiryDate": "YYYY-MM-DD" ou null (utilise null pour les produits frais ou si la date n'est pas lisible/estimable)
+  "name": "Nom du produit précis en français (ex: Courgette, Lait 1L, Yaourt Nature)",
+  "quantity": "Quantité estimée en chiffre ou texte (ex: 1, 2, 500g, 1L, 1 paquet)",
+  "category": "Une valeur stricte parmi: produce, meat, frozen, drinks, sauce, pantry, other",
+  "expiryDate": "La date de péremption exacte lue sur le produit, au format YYYY-MM-DD. Si tu ne vois aucune date lisible ou qu'elle n'est pas applicable (ex: légume frais sans emballage), renvoie la valeur null (sans guillemets)."
 }` },
                         { inlineData: { data: base64Image, mimeType: 'image/jpeg' } }
                     ]
