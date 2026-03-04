@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Ingredient, ShoppingItem, ShoppingListTemplate } from '../types';
-import { Check, Plus, Trash2, LayoutTemplate, Save, X, Pencil, ChevronDown, ShoppingCart, Archive, AlertTriangle, Wand2, Loader2 } from 'lucide-react';
+import { Check, Plus, Trash2, LayoutTemplate, Save, X, Pencil, ChevronDown, ShoppingCart, Package, AlertTriangle, Wand2, Loader2 } from 'lucide-react';
 import { scanRecipeAndDetectMissing } from '../services/geminiService';
 
 interface Props {
@@ -445,23 +445,23 @@ const ShoppingList: React.FC<Props> = ({ items, setItems, ingredients, onAddToSt
                         </div>
                     ))}
                 </div>
-
-                {/* FLOATING ACTION BUTTON FOR TRANSFER */}
-                {checkedItems.length > 0 && (
-                    <div className="absolute bottom-24 left-0 right-0 px-4 flex justify-center z-30 animate-in slide-in-from-bottom-6 fade-in duration-300 pointer-events-none">
-                        <button
-                            onClick={handleTransferToStock}
-                            className="pointer-events-auto bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3.5 rounded-full shadow-2xl flex items-center gap-3 active:scale-95 transition-all hover:scale-105 border-2 border-slate-700 dark:border-slate-200"
-                        >
-                            <div className="bg-emerald-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">
-                                {checkedItems.length}
-                            </div>
-                            <span className="font-bold text-sm pr-1">Ajouter au Stock</span>
-                            <Archive size={18} />
-                        </button>
-                    </div>
-                )}
             </div>
+
+            {/* FLOATING ACTION BUTTON FOR TRANSFER */}
+            {checkedItems.length > 0 && (
+                <div className="absolute bottom-24 left-0 right-0 px-4 flex justify-center z-30 animate-in slide-in-from-bottom-6 fade-in duration-300 pointer-events-none">
+                    <button
+                        onClick={handleTransferToStock}
+                        className="pointer-events-auto bg-white dark:bg-slate-800 text-slate-800 dark:text-white px-5 py-3 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 dark:border-slate-700 flex items-center gap-4 active:scale-95 transition-all hover:-translate-y-1 hover:shadow-[0_12px_40px_rgb(0,0,0,0.16)]"
+                    >
+                        <div className="bg-[#10b981] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shadow-sm">
+                            {checkedItems.length}
+                        </div>
+                        <span className="font-bold text-[15px] pt-0.5 tracking-tight">Ajouter au Stock</span>
+                        <Package size={20} className="text-slate-700 dark:text-slate-300" strokeWidth={2.5} />
+                    </button>
+                </div>
+            )}
 
             <style>{`
           .custom-scrollbar::-webkit-scrollbar { width: 4px; }
